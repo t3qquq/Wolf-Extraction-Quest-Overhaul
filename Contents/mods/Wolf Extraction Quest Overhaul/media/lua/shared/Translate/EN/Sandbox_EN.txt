@@ -1,0 +1,9 @@
+Sandbox_EN = {
+
+    Sandbox_WQS_ZoneMap_optlist_option2 = "Mega Mall",
+    Sandbox_WQS_ZoneMap_optlist_option5 = "LV International Airport Gate A4",
+    Sandbox_WQS_ZoneMap_optlist_option7 = "Lake Cumberland Mall",
+    Sandbox_WQS_ZoneMap_optlist_option8 = "Over the River Bridge",
+    Sandbox_WQS_ZoneMap_optlist_option9 = "Research Facility Helipad",
+
+}

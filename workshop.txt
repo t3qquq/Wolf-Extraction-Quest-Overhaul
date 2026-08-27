@@ -1,0 +1,6 @@
+version=1
+id=
+title=Wolf Extraction Quest Overhaul
+description=
+tags=
+visibility=unlisted

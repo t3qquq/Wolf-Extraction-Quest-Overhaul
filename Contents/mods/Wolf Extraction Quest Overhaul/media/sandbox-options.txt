@@ -1,0 +1,71 @@
+VERSION = 1,
+
+option WQS_DeadlineDays_opt
+{
+	type = integer, min = 0, max = 180, default = 0,
+	page = WQS, translation = WQS_DeadlineDays_txt,
+}
+
+option WQS_ExtractionEventHoursDuration_opt
+{
+	type = integer, min = 3, max = 48, default = 3,
+	page = WQS, translation = WQS_ExtractionEventHoursDuration_txt,
+}
+
+option WQS_ExtractionEventDifficulty_opt
+{
+	type = double, min = 0.1, max = 4, default = 1,
+	page = WQS, translation = WQS_ExtractionEventDifficulty_txt,
+}
+
+option WQS_WaitForSignalDuration_opt
+{
+	type = integer, min = 0, max = 365, default = 0,
+	page = WQS, translation = WQS_WaitForSignalDuration_txt,
+}
+
+
+option WQS_RepeatersModeHowMany_opt
+{
+	type = integer, min = 0, max = 4, default = 0,
+	page = WQS, translation = WQS_RepeatersModeHowMany_txt,
+}
+
+option WQS_ItemInZombieLootMultiplier_opt
+{
+	type = double, min = 0.1, max = 5, default = 1,
+	page = WQS, translation = WQS_ItemInZombieLootMultiplier_txt,
+}
+
+option WQS_StartWithExtractionItem_opt
+{
+	type = boolean, default = false,
+	page = WQS, translation = WQS_StartWithExtractionItem_txt,
+}
+
+option WQS_ConfinedMode_opt
+{
+	type = boolean, default = false,
+	page = WQS, translation = WQS_ConfinedMode_txt,
+}
+
+option WQS_GameModeExtended_opt
+{
+	type = boolean, default = false,
+	page = WQS, translation = WQS_GameModeExtended_txt,
+}
+
+
+option WQS_ZoneMap_opt
+{
+	type = enum,numValues = 10,default = 1,
+	page = WQS, translation = WQS_ZoneMap_txt,
+	valueTranslation = WQS_ZoneMap_optlist,
+}
+option WQS_ZoneMap_random_opt
+{
+	type = enum,numValues = 3,default = 1,
+	page = WQS, translation = WQS_ZoneMap_random_txt,
+	valueTranslation = WQS_ZoneMap_random_optlist,
+}
+

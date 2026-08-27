@@ -1,0 +1,74 @@
+[
+    {
+        "id": 1,
+        "name": "Dixie",
+        "xmin": 11400,
+        "ymin": 8000,
+        "xmax": 12400,
+        "ymax": 9000,
+
+    },
+    {
+        "id": 28,
+        "name": "Doe Valley",
+        "xmin": 5300,
+        "ymin": 7600,
+        "xmax": 9000,
+        "ymax": 10300,
+
+    },
+    {
+        "id": 19,
+        "name": "March Ridge",
+        "xmin": 9600,
+        "ymin": 1250,
+        "xmax": 10614,
+        "ymax": 13200,
+
+    },
+    {
+        "id": 2,
+        "name": "Muldraugh",
+        "xmin": 9600,
+        "ymin": 8800,
+        "xmax": 12000,
+        "ymax": 11000,
+
+    },
+    {
+        "id": 22,
+        "name": "Riverside",
+        "xmin": 3500,
+        "ymin": 5000,
+        "xmax": 7000,
+        "ymax": 7000,
+
+    },
+    {
+        "id": 18,
+        "name": "Rosewood",
+        "xmin": 7300,
+        "ymin": 11200,
+        "xmax": 9400,
+        "ymax": 12500,
+
+    },
+    {
+        "id": 3,
+        "name": "Valley Station",
+        "xmin": 12350,
+        "ymin": 4450,
+        "xmax": 14700,
+        "ymax": 6100,
+
+    },
+    {
+        "id": 4,
+        "name": "West Point",
+        "xmin": 9800,
+        "ymin": 6500,
+        "xmax": 12600,
+        "ymax": 7560,
+
+    }
+]
