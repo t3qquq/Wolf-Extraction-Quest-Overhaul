@@ -1,28 +1,35 @@
 WQS_RepeaterData = {
+
+    -- ===== 사용 지역 (사용자 맵 리스트와 일치, 활성) =====
+
     {
         ["area"] = "Bedford Falls",
         ["name"] = "Hotel",
         ["x"] = 13544,
         ["y"] = 10895,
     },
+
     {
         ["area"] = "Military Airfield",
         ["name"] = "Control tower",
         ["x"] = 9866,
         ["y"] = 8496,
     },
+
     {
         ["area"] = "Fort Rock Ridge",
         ["name"] = "Bunker",
         ["x"] = 6796,
         ["y"] = 6167,
     },
+
     {
         ["area"] = "West Point",
         ["name"] = "Court",
         ["x"] = 12332,
         ["y"] = 7026,
     },
+
     {
         ["area"] = "Raven Creek",
         ["name"] = "Apartment",
@@ -30,6 +37,7 @@ WQS_RepeaterData = {
         ["y"] = 11205,
         ["z"] = 6,
     },
+
     {
         ["area"] = "Petroville",
         ["name"] = "hospital",
@@ -37,6 +45,7 @@ WQS_RepeaterData = {
         ["y"] = 11824,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Fort Rock Ridge",
         ["name"] = "Control tower",
@@ -44,6 +53,7 @@ WQS_RepeaterData = {
         ["y"] = 6321,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Bedford Falls",
         ["name"] = "Education Center",
@@ -51,6 +61,7 @@ WQS_RepeaterData = {
         ["y"] = 10949,
         ["z"] = 0,
     },
+
     {
         ["area"] = "Tandil",
         ["name"] = "Mega Church",
@@ -58,6 +69,7 @@ WQS_RepeaterData = {
         ["y"] = 14366,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Petroville",
         ["name"] = "Mall",
@@ -65,6 +77,7 @@ WQS_RepeaterData = {
         ["y"] = 12201,
         ["z"] = 4,
     },
+
     {
         ["area"] = "Petroville", 
         ["name"] = "Transport Aircraft",
@@ -72,6 +85,7 @@ WQS_RepeaterData = {
         ["y"] = 11843,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Louisville",
         ["name"] = "Havisham Hotel",
@@ -87,6 +101,7 @@ WQS_RepeaterData = {
         ["y"] = 1449,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Louisville",
         ["name"] = "Finnegan Research Group",
@@ -94,6 +109,7 @@ WQS_RepeaterData = {
         ["y"] = 1703,
         ["z"] = 6,
     },
+
     {
         ["area"] = "Louisville",
         ["name"] = "University",
@@ -101,6 +117,7 @@ WQS_RepeaterData = {
         ["y"] = 2149,
         ["z"] = 5,
     },
+
     {
         ["area"] = "Louisville",
         ["name"] = "St. Peregrin Hospital",
@@ -108,13 +125,7 @@ WQS_RepeaterData = {
         ["y"] = 3646,
         ["z"] = 0,
     },
-    {
-        ["area"] = "Valley Station", 
-        ["name"] = "Crossroads Mall",
-        ["x"] = 13902,
-        ["y"] = 5872,
-        ["z"] = 3,
-    },
+
     {
         ["area"] = "New Tersh", 
         ["name"] = "School",
@@ -122,13 +133,7 @@ WQS_RepeaterData = {
         ["y"] = 9325,
         ["z"] = 2,
     },
-    {
-        ["area"] = "Dirkerdam", 
-        ["name"] = "Apartment",
-        ["x"] = 7397,
-        ["y"] = 3355,
-        ["z"] = 4,
-    },
+
     {
         ["area"] = "LV International Airport", ----------
         ["name"] = "Main Terminal",
@@ -136,13 +141,7 @@ WQS_RepeaterData = {
         ["y"] = 4669,
         ["z"] = 2,
     },
-    -- {
-    --     ["area"] = "LV International Airport", ----------
-    --     ["name"] = "Office",
-    --     ["x"] = 12955,
-    --     ["y"] = 4610,
-    --     ["z"] = 0,
-    -- },
+
     {
         ["area"] = "Louisville Shipping Port", 
         ["name"] = "Port Crane",
@@ -150,6 +149,7 @@ WQS_RepeaterData = {
         ["y"] = 4609,
         ["z"] = 4,
     },
+
     {
         ["area"] = "Over the River", 
         ["name"] = "Stadium",
@@ -157,6 +157,7 @@ WQS_RepeaterData = {
         ["y"] = 6116,
         ["z"] = 0,
     },
+
     {
         ["area"] = "Over the River", 
         ["name"] = "Military Base",
@@ -164,34 +165,7 @@ WQS_RepeaterData = {
         ["y"] = 5739,
         ["z"] = 2,
     },
-    {
-        ["area"] = "St Paulo's Hammer", 
-        ["name"] = "Government Office",
-        ["x"] = 4084,
-        ["y"] = 9433,
-        ["z"] = 3,
-    },
-    {
-        ["area"] = "St Paulo's Hammer", 
-        ["name"] = "Hospital",
-        ["x"] = 4162,
-        ["y"] = 9800,
-        ["z"] = 4,
-    },
-    {
-        ["area"] = "St Paulo's Hammer", 
-        ["name"] = "Building",
-        ["x"] = 4238,
-        ["y"] = 10052,
-        ["z"] = 5,
-    },
-    {
-        ["area"] = "St Paulo's Hammer", 
-        ["name"] = "Arms Factory",
-        ["x"] = 3866,
-        ["y"] = 10515,
-        ["z"] = 2,
-    },
+
     {
         ["area"] = "Lake Cumberland", 
         ["name"] = "Expo",
@@ -199,6 +173,7 @@ WQS_RepeaterData = {
         ["y"] = 7220,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Lake Cumberland", 
         ["name"] = "Large Warehouse",
@@ -206,6 +181,7 @@ WQS_RepeaterData = {
         ["y"] = 7904,
         ["z"] = 3,
     },
+
     {
         ["area"] = "The", 
         ["name"] = "Mall",
@@ -213,6 +189,7 @@ WQS_RepeaterData = {
         ["y"] = 11277,
         ["z"] = 1,
     },
+
     {
         ["area"] = "Overlook", 
         ["name"] = "Hotel",
@@ -220,6 +197,7 @@ WQS_RepeaterData = {
         ["y"] = 6435,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Southwood", 
         ["name"] = "McCoy",
@@ -227,20 +205,7 @@ WQS_RepeaterData = {
         ["y"] = 5856,
         ["z"] = 2,
     },
-    {
-        ["area"] = "Cedar Hill", 
-        ["name"] = "Mixed-Use Building",
-        ["x"] = 4930,
-        ["y"] = 5928,
-        ["z"] = 6,
-    },
-    {
-        ["area"] = "Cedar Hill", 
-        ["name"] = "Mixed-Use Building2",
-        ["x"] = 4845,
-        ["y"] = 5768,
-        ["z"] = 5,
-    },
+
     {
         ["area"] = "Research Facility", 
         ["name"] = "Research Institute",
@@ -248,6 +213,7 @@ WQS_RepeaterData = {
         ["y"] = 12622,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Utopia",
         ["name"] = "Mall",
@@ -255,6 +221,7 @@ WQS_RepeaterData = {
         ["y"] = 9662,
         ["z"] = 5,
     },
+
     {
         ["area"] = "Delta Creek",
         ["name"] = "Munitions",
@@ -262,6 +229,7 @@ WQS_RepeaterData = {
         ["y"] = 8476,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Greenleaf", 
         ["name"] = "Pub",
@@ -269,6 +237,7 @@ WQS_RepeaterData = {
         ["y"] = 10227,
         ["z"] = 2,
     },
+
     {
         ["area"] = "The", 
         ["name"] = "Museum",
@@ -276,6 +245,7 @@ WQS_RepeaterData = {
         ["y"] = 8172,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Chinatown Expansion", 
         ["name"] = "Commercial Complex",
@@ -283,6 +253,7 @@ WQS_RepeaterData = {
         ["y"] = 8589,
         ["z"] = 4,
     },
+
     {
         ["area"] = "Chinatown Expansion", 
         ["name"] = "Mixed-Use Building",
@@ -290,6 +261,7 @@ WQS_RepeaterData = {
         ["y"] = 8845,
         ["z"] = 6,
     },
+
     {
         ["area"] = "Chinatown", 
         ["name"] = "Oriental Medicine",
@@ -297,6 +269,7 @@ WQS_RepeaterData = {
         ["y"] = 8789,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Chinatown", 
         ["name"] = "Mixed-Use Building",
@@ -304,6 +277,7 @@ WQS_RepeaterData = {
         ["y"] = 8855,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Monmouth County", 
         ["name"] = "Broadcast stations",
@@ -311,6 +285,7 @@ WQS_RepeaterData = {
         ["y"] = 8611,
         ["z"] = 1,
     },
+
     {
         ["area"] = "Monmouth County", 
         ["name"] = "Apartment",
@@ -318,6 +293,7 @@ WQS_RepeaterData = {
         ["y"] = 8470,
         ["z"] = 5,
     },
+
     {
         ["area"] = "Trelai", 
         ["name"] = "Church",
@@ -325,6 +301,7 @@ WQS_RepeaterData = {
         ["y"] = 6724,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Trelai",
         ["name"] = "Museum",
@@ -332,6 +309,7 @@ WQS_RepeaterData = {
         ["y"] = 7406,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Trelai", 
         ["name"] = "Mixed-Use Building",
@@ -339,6 +317,7 @@ WQS_RepeaterData = {
         ["y"] = 6982,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Trelai", 
         ["name"] = "Cinema",
@@ -346,6 +325,7 @@ WQS_RepeaterData = {
         ["y"] = 6691,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Trelai", 
         ["name"] = "University",
@@ -353,6 +333,7 @@ WQS_RepeaterData = {
         ["y"] = 7666,
         ["z"] = 5,
     },
+
     {
         ["area"] = "Pitstop",
         ["name"] = "Expo",
@@ -360,6 +341,7 @@ WQS_RepeaterData = {
         ["y"] = 11552,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Pitstop",
         ["name"] = "Motel",
@@ -367,6 +349,7 @@ WQS_RepeaterData = {
         ["y"] = 11179,
         ["z"] = 0,
     },
+
     {
         ["area"] = "The Walking Dead",
         ["name"] = "Prison",
@@ -374,6 +357,7 @@ WQS_RepeaterData = {
         ["y"] = 9409,
         ["z"] = 2,
     },
+
     {
         ["area"] = "Elysium",
         ["name"] = "Antenna",
@@ -381,27 +365,7 @@ WQS_RepeaterData = {
         ["y"] = 6683,
         ["z"] = 0,
     },
-    {
-        ["area"] = "Amusement Park",
-        ["name"] = "Roller Coaster",
-        ["x"] = 13614,
-        ["y"] = 4263,
-        ["z"] = 3,
-    },
-    {
-        ["area"] = "Dirkerdam",
-        ["name"] = "Research Center",
-        ["x"] = 8432,
-        ["y"] = 3862,
-        ["z"] = 2,
-    },
-    {
-        ["area"] = "Dirkerdam",
-        ["name"] = "Survivor Village",
-        ["x"] = 10118,
-        ["y"] = 3438,
-        ["z"] = 2,
-    },
+
     {
         ["area"] = "Muldraugh",
         ["name"] = "Sunstar Motel",
@@ -409,6 +373,7 @@ WQS_RepeaterData = {
         ["y"] = 9815,
         ["z"] = 0,
     },
+
     {
         ["area"] = "Muldraugh",
         ["name"] = "Military Base",
@@ -416,6 +381,7 @@ WQS_RepeaterData = {
         ["y"] = 10366,
         ["z"] = 1,
     },
+
     {
         ["area"] = "Grapeseed",
         ["name"] = "Starlion Club",
@@ -423,6 +389,7 @@ WQS_RepeaterData = {
         ["y"] = 11288,
         ["z"] = 1,
     },
+
     {
         ["area"] = "Raven Creek",
         ["name"] = "Research Center",
@@ -430,6 +397,7 @@ WQS_RepeaterData = {
         ["y"] = 11190,
         ["z"] = 3,
     },
+
     {
         ["area"] = "Raven Creek",
         ["name"] = "Luxury House",
@@ -437,6 +405,7 @@ WQS_RepeaterData = {
         ["y"] = 11986,
         ["z"] = 7,
     },
+
     {
         ["area"] = "Raven Creek",
         ["name"] = "Sky Bridge",
@@ -444,6 +413,7 @@ WQS_RepeaterData = {
         ["y"] = 11280,
         ["z"] = 4,
     },
+
     {
         ["area"] = "Raven Creek",
         ["name"] = "Asylum",
@@ -453,11 +423,106 @@ WQS_RepeaterData = {
     },
 
 
+    -- ===== 사용자 맵 리스트에 없는 지역 (신규 주석처리) =====
+
+    -- {
+        -- ["area"] = "Valley Station", 
+        -- ["name"] = "Crossroads Mall",
+        -- ["x"] = 13902,
+        -- ["y"] = 5872,
+        -- ["z"] = 3,
+    -- },
+
+    -- {
+        -- ["area"] = "Dirkerdam", 
+        -- ["name"] = "Apartment",
+        -- ["x"] = 7397,
+        -- ["y"] = 3355,
+        -- ["z"] = 4,
+    -- },
+
+    -- {
+        -- ["area"] = "St Paulo's Hammer", 
+        -- ["name"] = "Government Office",
+        -- ["x"] = 4084,
+        -- ["y"] = 9433,
+        -- ["z"] = 3,
+    -- },
+
+    -- {
+        -- ["area"] = "St Paulo's Hammer", 
+        -- ["name"] = "Hospital",
+        -- ["x"] = 4162,
+        -- ["y"] = 9800,
+        -- ["z"] = 4,
+    -- },
+
+    -- {
+        -- ["area"] = "St Paulo's Hammer", 
+        -- ["name"] = "Building",
+        -- ["x"] = 4238,
+        -- ["y"] = 10052,
+        -- ["z"] = 5,
+    -- },
+
+    -- {
+        -- ["area"] = "St Paulo's Hammer", 
+        -- ["name"] = "Arms Factory",
+        -- ["x"] = 3866,
+        -- ["y"] = 10515,
+        -- ["z"] = 2,
+    -- },
+
+    -- {
+        -- ["area"] = "Cedar Hill", 
+        -- ["name"] = "Mixed-Use Building",
+        -- ["x"] = 4930,
+        -- ["y"] = 5928,
+        -- ["z"] = 6,
+    -- },
+
+    -- {
+        -- ["area"] = "Cedar Hill", 
+        -- ["name"] = "Mixed-Use Building2",
+        -- ["x"] = 4845,
+        -- ["y"] = 5768,
+        -- ["z"] = 5,
+    -- },
+
+    -- {
+        -- ["area"] = "Amusement Park",
+        -- ["name"] = "Roller Coaster",
+        -- ["x"] = 13614,
+        -- ["y"] = 4263,
+        -- ["z"] = 3,
+    -- },
+
+    -- {
+        -- ["area"] = "Dirkerdam",
+        -- ["name"] = "Research Center",
+        -- ["x"] = 8432,
+        -- ["y"] = 3862,
+        -- ["z"] = 2,
+    -- },
+
+    -- {
+        -- ["area"] = "Dirkerdam",
+        -- ["name"] = "Survivor Village",
+        -- ["x"] = 10118,
+        -- ["y"] = 3438,
+        -- ["z"] = 2,
+    -- },
 
 
+    -- ===== 원래부터 주석처리되어 있던 항목 (미확인/미사용) =====
 
-
-
+    -- {
+    --     ["area"] = "LV International Airport", ----------
+    --     ["name"] = "Office",
+    --     ["x"] = 12955,
+    --     ["y"] = 4610,
+    --     ["z"] = 0,
+    -- },
 
     -- {
     --     ["area"] = "Dixie",
@@ -465,204 +530,238 @@ WQS_RepeaterData = {
     --     ["x"] = 11556,
     --     ["y"] = 8858,
     -- },
+
     -- {
     --     ["area"] = "Dixie",
     --     ["name"] = "Molans Used Cars",
     --     ["x"] = 11687,
     --     ["y"] = 8367,
     -- },
+
     -- {
     --     ["area"] = "Doe Valley",
     --     ["name"] = "Warehouses",
     --     ["x"] = 6734,
     --     ["y"] = 10020,
     -- },
+
     -- {
     --     ["area"] = "Doe Valley",
     --     ["name"] = "Military Store",
     --     ["x"] = 5464,
     --     ["y"] = 9511
     -- },
+
     -- {
     --     ["area"] = "Doe Valley",
     --     ["name"] = "Church",
     --     ["x"] = 7387,
     --     ["y"] = 8353
     -- },
+
     -- {
     --     ["area"] = "Louisville",
     --     ["name"] = "Train Yard",
     --     ["x"] = 12675,
     --     ["y"] = 4403
     -- },
+
     -- {
     --     ["area"] = "Louisville",
     --     ["name"] = "Power Hub",
     --     ["x"] = 14763,
     --     ["y"] = 4085
     -- },
+
     -- {
     --     ["area"] = "Louisville",
     --     ["name"] = "Corn Maze",
     --     ["x"] = 13716,
     --     ["y"] = 3693
     -- },
-    -- -- {
+
+    -- {
     -- --     ["area"] = "March Ridge",
     -- --     ["name"] = "Post Office",
     -- --     ["x"] = 10107,
     -- --     ["y"] = 12713,
     -- -- },
+
     -- {
     --     ["area"] = "March Ridge",
     --     ["name"] = "Church",
     --     ["x"] = 10328,
     --     ["y"] = 12794,
     -- },
+
     -- {
     --     ["area"] = "March Ridge",
     --     ["name"] = "Playground",
     --     ["x"] = 9882,
     --     ["y"] = 13033,
     -- },
+
     -- {
     --     ["area"] = "Muldraugh",
     --     ["name"] = "Chapel",
     --     ["x"] = 10723,
     --     ["y"] = 9711,
     -- },
-    -- -- {
+
+    -- {
     -- --     ["area"] = "Muldraugh",
     -- --     ["name"] = "Adult Education Center",
     -- --     ["x"] = 10638,
     -- --     ["y"] = 9904,
     -- -- },
-    -- -- {
+
+    -- {
     -- --     ["area"] = "Muldraugh",
     -- --     ["name"] = "All you can eat",
     -- --     ["x"] = 10619,
     -- --     ["y"] = 9437,
     -- -- },
+
     -- {
     --     ["area"] = "Muldraugh",
     --     ["name"] = "Warehouse",
     --     ["x"] = 10694,
     --     ["y"] = 10103,
     -- },
+
     -- {
     --     ["area"] = "Muldraugh",
     --     ["name"] = "Railyard",
     --     ["x"] = 11655,
     --     ["y"] = 9985
     -- },
+
     -- {
     --     ["area"] = "Muldraugh",
     --     ["name"] = "Radio relay station",
     --     ["x"] = 10278,
     --     ["y"] = 8749
     -- },
+
     -- {
     --     ["area"] = "Riverside",
     --     ["name"] = "Hardware Store",
     --     ["x"] = 6364,
     --     ["y"] = 5327,
     -- },
+
     -- {
     --     ["area"] = "Riverside",
     --     ["name"] = "Food Market",
     --     ["x"] = 5969,
     --     ["y"] = 5392,
     -- },
+
     -- {
     --     ["area"] = "Riverside",
     --     ["name"] = "Police Station",
     --     ["x"] = 6082,
     --     ["y"] = 5261,
     -- },
+
     -- {
     --     ["area"] = "Riverside",
     --     ["name"] = "Burgers",
     --     ["x"] = 5955,
     --     ["y"] = 5263,
     -- },
+
     -- {
     --     ["area"] = "Riverside",
     --     ["name"] = "Country club",
     --     ["x"] = 5765,
     --     ["y"] = 6470
     -- },
+
     -- {
     --     ["area"] = "Riverside",
     --     ["name"] = "C.G.E. Corp",
     --     ["x"] = 3874,
     --     ["y"] = 6204
     -- },
+
     -- {
     --     ["area"] = "Rosewood",
     --     ["name"] = "Medical",
     --     ["x"] = 8089,
     --     ["y"] = 11526,
     -- },
+
     -- {
     --     ["area"] = "Rosewood",
     --     ["name"] = "Construction Site",
     --     ["x"] = 8219,
     --     ["y"] = 11841,
     -- },
+
     -- {
     --     ["area"] = "Rosewood",
     --     ["name"] = "Drive In",
     --     ["x"] = 8426,
     --     ["y"] = 12240
     -- },
+
     -- {
     --     ["area"] = "Rosewood",
     --     ["name"] = "Army Quarter",
     --     ["x"] = 9118,
     --     ["y"] = 11814
     -- },
+
     -- {
     --     ["area"] = "Valley Station",
     --     ["name"] = "Knox Bank",
     --     ["x"] = 13656,
     --     ["y"] = 5745,
     -- },
+
     -- {
     --     ["area"] = "Valley Station",
     --     ["name"] = "Shooting Range",
     --     ["x"] = 13266,
     --     ["y"] = 5442,
     -- },
+
     -- {
     --     ["area"] = "Valley Station",
     --     ["name"] = "Soccer Field",
     --     ["x"] = 13698,
     --     ["y"] = 6702,
     -- },
+
     -- {
     --     ["area"] = "Valley Station",
     --     ["name"] = "Graveyard",
     --     ["x"] = 14565,
     --     ["y"] = 4975,
     -- },
+
     -- {
     --     ["area"] = "West Point",
     --     ["name"] = "Knox Bank",
     --     ["x"] = 11913,
     --     ["y"] = 6914,
     -- },
+
     -- {
     --     ["area"] = "West Point",
     --     ["name"] = "Fossoil",
     --     ["x"] = 12069,
     --     ["y"] = 7140,
     -- },
+
     -- {
     --     ["area"] = "West Point",
     --     ["name"] = "Picnic area",
     --     ["x"] = 12033,
     --     ["y"] = 7364,
     -- },
+
     -- {
     --     ["area"] = "West Point",
     --     ["name"] = "Cemetary",
