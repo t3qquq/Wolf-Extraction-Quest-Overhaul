@@ -422,16 +422,57 @@ WQS_RepeaterData = {
         ["z"] = 3,
     },
 
+    {
+        ["area"] = "Valley Station", 
+        ["name"] = "Crossroads Mall",
+        ["x"] = 13902,
+        ["y"] = 5872,
+        ["z"] = 3,
+    },
+    
+    {
+        ["area"] = "St Paulo's Hammer", 
+        ["name"] = "Government Office",
+        ["x"] = 4084,
+        ["y"] = 9433,
+        ["z"] = 3,
+    },
+
+    {
+        ["area"] = "St Paulo's Hammer", 
+        ["name"] = "Hospital",
+        ["x"] = 4162,
+        ["y"] = 9800,
+        ["z"] = 4,
+    },
+
+    {
+        ["area"] = "St Paulo's Hammer", 
+        ["name"] = "Building",
+        ["x"] = 4238,
+        ["y"] = 10052,
+        ["z"] = 5,
+    },
+    
+    {
+        ["area"] = "St Paulo's Hammer", 
+        ["name"] = "Arms Factory",
+        ["x"] = 3866,
+        ["y"] = 10515,
+        ["z"] = 2,
+    },
+    
+    {
+        ["area"] = "Amusement Park",
+        ["name"] = "Roller Coaster",
+        ["x"] = 13614,
+        ["y"] = 4263,
+        ["z"] = 3,
+    },
+
 
     -- ===== 사용자 맵 리스트에 없는 지역 (신규 주석처리) =====
 
-    -- {
-        -- ["area"] = "Valley Station", 
-        -- ["name"] = "Crossroads Mall",
-        -- ["x"] = 13902,
-        -- ["y"] = 5872,
-        -- ["z"] = 3,
-    -- },
 
     -- {
         -- ["area"] = "Dirkerdam", 
@@ -439,38 +480,6 @@ WQS_RepeaterData = {
         -- ["x"] = 7397,
         -- ["y"] = 3355,
         -- ["z"] = 4,
-    -- },
-
-    -- {
-        -- ["area"] = "St Paulo's Hammer", 
-        -- ["name"] = "Government Office",
-        -- ["x"] = 4084,
-        -- ["y"] = 9433,
-        -- ["z"] = 3,
-    -- },
-
-    -- {
-        -- ["area"] = "St Paulo's Hammer", 
-        -- ["name"] = "Hospital",
-        -- ["x"] = 4162,
-        -- ["y"] = 9800,
-        -- ["z"] = 4,
-    -- },
-
-    -- {
-        -- ["area"] = "St Paulo's Hammer", 
-        -- ["name"] = "Building",
-        -- ["x"] = 4238,
-        -- ["y"] = 10052,
-        -- ["z"] = 5,
-    -- },
-
-    -- {
-        -- ["area"] = "St Paulo's Hammer", 
-        -- ["name"] = "Arms Factory",
-        -- ["x"] = 3866,
-        -- ["y"] = 10515,
-        -- ["z"] = 2,
     -- },
 
     -- {
@@ -489,13 +498,6 @@ WQS_RepeaterData = {
         -- ["z"] = 5,
     -- },
 
-    -- {
-        -- ["area"] = "Amusement Park",
-        -- ["name"] = "Roller Coaster",
-        -- ["x"] = 13614,
-        -- ["y"] = 4263,
-        -- ["z"] = 3,
-    -- },
 
     -- {
         -- ["area"] = "Dirkerdam",
