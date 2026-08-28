@@ -182,11 +182,33 @@ local function WQS_GPSWindowUpdate()
 		WQS_GPSWindow.ReqExtrBut:setVisible(false)
 		WQS_GPSWindow.CompleteExtrBut:setVisible(false)
 		WQS_GPSWindow.ManageAntennaBut:setVisible(false)
+		WQS_GPSWindow.ReqExtrBut:setEnable(true)
+		WQS_GPSWindow.CompleteExtrBut:setEnable(true)
+		WQS_GPSWindow.ReqExtrBut:setTitle(ComposedStat.ReqExtractionLabel)
+		WQS_GPSWindow.CompleteExtrBut:setTitle(ComposedStat.CompleteExtractionLabel)
+
+		-- MP: roster line, green = condition met, red = still missing
+		local RosterTxt = ""
+
+		if not WQS_Session.HasFaction then
+			CurrentStateLabel = getText("IGUI_WQS_MP_NoFaction") or "You must join a faction to extract."
+		end
 
 		if ((WQS.CurrentStateIs("EXTRACTION_CAN_BE_STARTED"))) then
 			WQS_GPSWindow.ReqExtrBut:setVisible(true)
 			--WQS.SetState("EXTRACTION_CAN_BE_STARTED")
 			CurrentStateLabel = getText("IGUI_WQS_StatusExtraction2") or "Extraction can be requestedz"
+		end
+
+		-- MP: request gate. The button stays clickable so a member can undo
+		-- their request; when the last one does, the server drops back to PRE.
+		if (WQS.CurrentStateIs("EXTRACTION_WAITING_REQUEST")) then
+			WQS_GPSWindow.ReqExtrBut:setVisible(true)
+			local waitLbl = getText("IGUI_WQS_MP_WaitingRequest") or "Waiting for extraction request"
+			WQS_GPSWindow.ReqExtrBut:setTitle(waitLbl ..
+				" (" .. WQS_Session.GetReadyCount() .. "/" .. WQS_Session.GetReadyTotal() .. ")")
+			CurrentStateLabel = waitLbl
+			RosterTxt = WQS_Session.GetMemberRosterTxt(false)
 		end
 
 		if (WQS.CurrentStateIs("EXTRACTION_RUNNING")) then
@@ -198,6 +220,19 @@ local function WQS_GPSWindowUpdate()
 		if (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE")) then
 			CurrentStateLabel = getText("IGUI_WQS_StatusExtraction5") or
 				"Extraction can be completeted, go to extraction zone!"
+			RosterTxt = WQS_Session.GetMemberRosterTxt(true)
+		end
+
+		-- MP: completion gate. This player is in the zone but the faction is
+		-- not complete yet, so the button shows progress and is not clickable.
+		if (WQS.CurrentStateIs("EXTRACTION_WAITING_ARRIVAL")) then
+			WQS_GPSWindow.CompleteExtrBut:setVisible(true)
+			WQS_GPSWindow.CompleteExtrBut:setEnable(false)
+			local waitLbl = getText("IGUI_WQS_MP_WaitingArrival") or "Waiting for extraction"
+			WQS_GPSWindow.CompleteExtrBut:setTitle(waitLbl ..
+				" (" .. WQS_Session.GetArrivedCount() .. "/" .. WQS_Session.GetArrivedTotal() .. ")")
+			CurrentStateLabel = waitLbl
+			RosterTxt = WQS_Session.GetMemberRosterTxt(true)
 		end
 
 		if (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED")) then
@@ -230,6 +265,9 @@ local function WQS_GPSWindowUpdate()
 			end
 			--GuiTxt = GuiTxt.." <LINE> <H2> "..CurrentStateLabel.." <SIZE:small> "
 			GuiTxt = GuiTxt .. " <SIZE:small> <LINE> <SIZE:small> " .. CurrentStateLabel
+			if RosterTxt ~= "" then
+				GuiTxt = GuiTxt .. " <LINE> <LEFT> " .. RosterTxt .. " <LINE> "
+			end
 		end
 
 		if (data.CanUseAntenna) then

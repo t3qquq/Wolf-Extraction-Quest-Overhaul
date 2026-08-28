@@ -84,6 +84,9 @@ IGUI_EN = {
 
     IGUI_WQS_EndModal = "<H1> So it ends? <LINE> <TEXT> <IMAGECENTRE:media/ui/img/final.png> <LINE> <LINE>  <SIZE:large> Just when you think all hope is lost, you see the helicopter hovering on you, closing the distance... you sprint towards it, dodging zombies left and right. <LINE> As you get closer, you can see the pilot waving frantically, urging you to hurry. <LINE> You jump and grab onto the landing skids, pulling yourself up just as the helicopter rises into the air. <LINE> The storm is fierce and the pilot struggles to keep it steady, suddenly, there's a loud bang, and the helicopter starts to spin out of control. <LINE> <LINE> <CENTRE> You brace for impact, unsure if you'll survive... <LINE> <CENTRE> <SIZE:large> <H1> ...is this gonna be how you died? <LINE> <LINE> ",
 
+    IGUI_WQS_MP_WaitingRequest = "Waiting for extraction request",
+    IGUI_WQS_MP_WaitingArrival = "Waiting for extraction",
+    IGUI_WQS_MP_NoFaction = "You must belong to a faction to request extraction.",
 }
 
 

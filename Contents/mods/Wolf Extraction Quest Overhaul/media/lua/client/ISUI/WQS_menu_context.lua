@@ -46,6 +46,18 @@ function WQS_ExtractionItem_context(player, context, items)
 
 		if (WQS.CurrentStateIs("EXTRACTION_CAN_BE_STARTED")) then
 			subOption_first = subMenu:addOption(ComposedStat.ReqExtractionLabel, player, WQS.BeginExtraction)
+		elseif (WQS.CurrentStateIs("EXTRACTION_WAITING_REQUEST")) then
+			-- MP: still clickable, pressing again withdraws the request
+			local waitLbl = getText("IGUI_WQS_MP_WaitingRequest") or "Waiting for extraction request"
+			subMenu:addOption(waitLbl ..
+				" (" .. WQS_Session.GetReadyCount() .. "/" .. WQS_Session.GetReadyTotal() .. ")",
+				player, WQS.BeginExtraction)
+		elseif (WQS.CurrentStateIs("EXTRACTION_WAITING_ARRIVAL")) then
+			-- MP: gate not satisfied yet, show progress only
+			local waitLbl = getText("IGUI_WQS_MP_WaitingArrival") or "Waiting for extraction"
+			local line = subMenu:addOption(waitLbl ..
+				" (" .. WQS_Session.GetArrivedCount() .. "/" .. WQS_Session.GetArrivedTotal() .. ")")
+			line.notAvailable = true
 		elseif (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED")) then
 			subOption_first = subMenu:addOption(ComposedStat.CompleteExtractionLabel, player, WQS.CompleteExtraction)
 		end

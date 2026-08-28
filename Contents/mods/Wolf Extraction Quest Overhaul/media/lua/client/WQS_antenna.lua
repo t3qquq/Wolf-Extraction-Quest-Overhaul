@@ -95,123 +95,63 @@ function IsItemOnGroundNear(squareToCheck, ItemTypeToFind)
     return result
 end
 
+--- MP: this used to delete active repeaters from the local list whenever the
+--- antenna item was not found on its square. That cannot stay client side:
+--- the list is now faction wide, so any single client could wipe the whole
+--- team's progress, and an unloaded chunk looks identical to a stolen antenna.
+--- Kept as a read only probe until a server side DeactivateRepeater path exists.
 WQSAntenna.CheckStatusOfRepeaters = function()
     local RepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
     if not RepeaterList then
         return {}
     end
-    for k, v in pairs(RepeaterList) do
-        local SingleRepeater = RepeaterList[k]
-        --print(k.."===>"..WQS_Shared.Dump(SingleRepeater))
+    for k, SingleRepeater in pairs(RepeaterList) do
         local square = getCell():getGridSquare(SingleRepeater.x, SingleRepeater.y, SingleRepeater.z)
-        if square then --se sono lontano la cella non è caricata e quindi esco senza far nulla
-            --sono in una cella caricata nelle vicinanze del repeater, quindi mi assicuro che sia ancora lì
-            local RepeaterIsThere = IsItemOnSquare(square, WQS_Shared.getAntennaItemId())
-
-            if RepeaterIsThere then
-                --print("Repeater "..k.." is there!")
-            else
-                RepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
-                print("Repeater " .. k .. " is NOT there, removing it from list!")
-                if RepeaterList then
-                    -- local tr = RepeaterList[k].targetRep
-                    -- if tr and tr > 0 then
-                    --     local TargetRepeaterList = WQS_Shared.getWQSPlayerModData("TargetRepeaterList")
-                    --     if TargetRepeaterList and TargetRepeaterList[tr] then
-                    --         TargetRepeaterList[tr].ActivatedRepeaterHere = nil
-                    --         WQS_Shared.setWQSPlayerModData("TargetRepeaterList", TargetRepeaterList)
-                    --     end
-                    -- end
-                    RepeaterList[k] = nil
-                    WQS_Shared.setWQSPlayerModData("ActiveRepeaterList", RepeaterList)
-                end
+        if square then
+            if not IsItemOnSquare(square, WQS_Shared.getAntennaItemId()) then
+                print("WQS_MP WARN repeater " .. tostring(k) .. " antenna missing on a loaded square")
             end
         end
     end
-    RepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
     return RepeaterList
 end
 
 
+--- MP: the active list is keyed by target location on the server, not by the
+--- local item id, so identity is resolved by position instead.
 WQSAntenna.CurrentAntennaIsRepeater = function()
     local ant = WQSAntenna.GetAntennaItemFound()
-    if (ant and ant.theitem and ant.world_square and ant.world_square:isOutside() and ant.theitem:getID()) then
-        --print(ant.theitem)
-        --print(ant.theitem:getID())
-        local AntId = tostring(ant.theitem:getID())
-        local RepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
-        if RepeaterList and RepeaterList[AntId] then
+    if not (ant and ant.theitem and ant.world_square and ant.world_square:isOutside() and ant.theitem:getID()) then
+        return false
+    end
+    local AntWorldItem = ant.theitem:getWorldItem()
+    if not (AntWorldItem and AntWorldItem:getX()) then
+        return false
+    end
+
+    local ax = AntWorldItem:getX()
+    local ay = AntWorldItem:getY()
+    local maxDist = WQS_Shared.getRepeaterMaxActivationDistance()
+
+    local RepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
+    if not RepeaterList then
+        return false
+    end
+    for k, Rep in pairs(RepeaterList) do
+        if Rep.x and WQS.getDistance(ax, ay, Rep.x, Rep.y) <= maxDist then
             return true
         end
     end
     return false
 end
 
---rimuovo i repeaters troppo vicini agli extr point, usato da PickRandomRepeaterPosition
-WQSAntenna.RemoveRepeatersTooCloseToExtrPoints = function()
-    --escludo le posizioni dei repeater troppo vicini ai punti di estrazione
-    for pkey, pdata in pairs(WQS_ExtractionPointsData) do
-        --print(pdata.MapItem)
-        if pdata and pdata.MapCenterAreaX then
-            for rkey, repeater in pairs(WQS_RepeaterData) do
-                local dist = WQS.getDistance(repeater.x, repeater.y, pdata.MapCenterAreaX, pdata.MapCenterAreaY)
-                if dist < 130 then
-                    print("removing " .. pdata.MapItem .. "->" .. repeater.name .. " distance " .. dist)
-                    WQS_RepeaterData[rkey] = nil
-                end
-            end
-        end
-    end
-end
+-- MP: target repeater selection moved to server/WQS_MPSession.lua.
+-- RemoveRepeatersTooCloseToExtrPoints and PickRandomRepeaterPosition used to
+-- run here with a local ZombRand, which is exactly why every client ended up
+-- with a different repeater list. They are gone on purpose.
+-- The old RemoveRepeatersTooCloseToExtrPoints also nil'd entries out of the
+-- shared WQS_RepeaterData table, permanently damaging it for any later run.
 
----ritorna la posizione di un repeater random escludendo quelli già presi e quelli troppo vicini:
----{["area"] = "West Point", ["name"] = "Cemetary", ["x"] = 11069, ["y"] = 6710}
---- OtherRepeaterList contiene la posizione dei repeater già piazzati oppure {} se non ce ne sono es:
---- local OtherRepeaterList = { { x = 11687, y = 8367 }, { x = 8219, y = 11841 } }
---- OtherRepeaterList deve avere MASSIMO 4 elementi altrimenti non riuscirà a trovare punti validi
-WQSAntenna.PickRandomRepeaterPosition = function(OtherRepeaterList)
-    local pick
-    local ret = {}
-    local isOk = false
-    local isGoodPick = true
-    WQSAntenna.RemoveRepeatersTooCloseToExtrPoints() --rimuovo i repeaters troppo vicini agli extr point
-    if OtherRepeaterList and not (WQS_Shared.TableIsEmptyOrNil(OtherRepeaterList)) then
-        local fail = 0
-        while not (isOk) do
-            pick = WQS_Shared.PickRandomObjFromTableIfNotNil(WQS_RepeaterData)
-            isGoodPick = true
-            for key, rep in pairs(OtherRepeaterList) do
-                local dist = WQS.getDistance(pick.x, pick.y, rep.x, rep.y)
-                --print("dist "..dist)
-                local mindist = 380 * #OtherRepeaterList --380 distanza e max 4 altri punti in OtherRepeaterList
-                if fail > 20 then
-                    mindist = 100
-                    --print("reset dist to 100>"..dist)
-                end
-                if (pick.x == rep.x and pick.y == rep.y) or (dist < mindist) then
-                    --print(fail.."=cf NOT isGoodPick " .. pick.x .. "=" .. rep.x.." d="..dist.."<"..mindist)
-                    isGoodPick = false
-                    if dist > 0 then --considero falliti solo i punti con distanza sbagliata
-                        --print(fail.."=cf NOT isGoodPick " .. pick.x .. "=" .. rep.x.." d="..dist.."<"..mindist)
-                        fail = fail + 1
-                    end
-                end
-            end
-            if (isGoodPick) then
-                isOk = true
-                ret = pick
-            end
-            if fail > 50 then
-                isOk = true
-                print(" WQS ERROR PickRandomRepeaterPosition too many failed pick")
-            end
-        end
-    else
-        ret = WQS_Shared.PickRandomObjFromTableIfNotNil(WQS_RepeaterData)
-        -- print(" r= " .. tostring(ret))
-    end
-    return ret
-end
 
 --da finire
 -- WQSAntenna.getNearestTargetRepeater = function(x,y,z)
@@ -307,7 +247,11 @@ WQSAntenna.FindTargetRepeaterForActivation = function(x, y, isNotForActivation)
             --controllo se ci sono altri repeater attivati per questo target repeater
             --print("distance is ok")
             for key, ActiveRep in pairs(ActiveRepeaterList) do
-                if ActiveRep.activeForTargetRep and ActiveRep.activeForTargetRep == Rep then
+                -- was: ActiveRep.activeForTargetRep == Rep
+                -- Table identity does not survive ModData serialization nor the
+                -- server snapshot, so it silently never matched. Compare by key.
+                local atr = ActiveRep.activeForTargetRep
+                if atr and atr.area == Rep.area and atr.name == Rep.name then
                     thereAreOtherRepActivatedHere = true
                     --print("Other repater already active for this target!")
                 end
@@ -339,41 +283,41 @@ WQSAntenna.isCurrentAntennaActivableAsRepeater = function()
     return ret
 end
 
+--- MP: activation is a request now. One antenna per target location satisfies
+--- the whole faction, so members can split up and cover different sites.
+--- Deactivation is deliberately not exposed: a single member must not be able
+--- to erase faction progress.
 WQSAntenna.ToggleRepeaterMode = function()
     local ant = WQSAntenna.GetAntennaItemFound()
-    if (ant and ant.theitem and ant.world_square and ant.world_square:isOutside() and ant.theitem:getID()) then
-        local RepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
-        if not RepeaterList then
-            RepeaterList = {}
-        end
-        local AntId = tostring(ant.theitem:getID())
-
-        if not (WQSAntenna.CurrentAntennaIsRepeater()) then --SET AS REPEATER
-            local AntWorldItem = ant.theitem:getWorldItem()
-            if AntWorldItem and AntWorldItem:getX() then
-                local TargetRepeaterForActivation = WQSAntenna.FindTargetRepeaterForActivation(AntWorldItem:getX(),
-                    AntWorldItem:getY())
-                if TargetRepeaterForActivation and TargetRepeaterForActivation.x then
-                    RepeaterList[AntId] = {
-                        x = AntWorldItem:getX(),
-                        y = AntWorldItem:getY(),
-                        z = AntWorldItem:getZ(),
-                        activeForTargetRep = TargetRepeaterForActivation
-                    }
-                    WQS_Shared.setWQSPlayerModData("ActiveRepeaterList", RepeaterList)
-                    print("Antenna " .. AntId .. " IS a repeater now!")
-                else
-                    print("Antenna " .. AntId .. " WRONG activation place!")
-                end
-            end
-        else
-            if RepeaterList and RepeaterList[AntId] then --UNSET AS REPEATER
-                RepeaterList[AntId] = nil
-                WQS_Shared.setWQSPlayerModData("ActiveRepeaterList", RepeaterList)
-                print("Antenna " .. AntId .. " is NOT a repeater anymore")
-            end
-        end
+    if not (ant and ant.theitem and ant.world_square and ant.world_square:isOutside() and ant.theitem:getID()) then
+        return
     end
+
+    local AntId = tostring(ant.theitem:getID())
+
+    if WQSAntenna.CurrentAntennaIsRepeater() then
+        print("WQS_MP antenna " .. AntId .. " already active for the faction, nothing to do")
+        return
+    end
+
+    local AntWorldItem = ant.theitem:getWorldItem()
+    if not (AntWorldItem and AntWorldItem:getX()) then
+        return
+    end
+
+    local TargetRepeaterForActivation = WQSAntenna.FindTargetRepeaterForActivation(AntWorldItem:getX(),
+        AntWorldItem:getY())
+    if not (TargetRepeaterForActivation and TargetRepeaterForActivation.x) then
+        print("WQS_MP antenna " .. AntId .. " WRONG activation place!")
+        return
+    end
+
+    WQS_Session.Send("ActivateRepeater", {
+        x = AntWorldItem:getX(),
+        y = AntWorldItem:getY(),
+        z = AntWorldItem:getZ(),
+    })
+    print("WQS_MP antenna " .. AntId .. " activation requested")
 end
 
 
@@ -565,28 +509,17 @@ WQSAntenna.GenerateTargetRepeaterList = function(ForceAdd, EraseExistingRepeater
         NumTargetRepeaters = WQSAntenna.getMaxNumOfTargetRepeaters()
     end --MASSIMO 4!!
 
+    -- EraseExistingRepeaters is a no-op now: only the server may clear the
+    -- faction list, and it does so by destroying the session on a wipe.
     if EraseExistingRepeaters then
-        WQS_Shared.deleteWQSPlayerModData("TargetRepeaterList")
+        print("WQS_MP WARN EraseExistingRepeaters ignored, server owns the list")
     end
 
-    local TargetRepeaterList = WQS_Shared.getWQSPlayerModData("TargetRepeaterList")
-    if not (TargetRepeaterList) or WQS_Shared.TableIsEmptyOrNil(TargetRepeaterList) or (ForceAdd) then
-        for i = 1, NumTargetRepeaters, 1 do
-            TargetRepeaterList = WQS_Shared.getWQSPlayerModData("TargetRepeaterList")
-            if not TargetRepeaterList then
-                TargetRepeaterList = {}
-            end
-            local Trl = WQSAntenna.PickRandomRepeaterPosition(TargetRepeaterList)
-            if WQSAntenna.CanAddMoreTargetRepeaters() then
-                table.insert(TargetRepeaterList, Trl)
-                WQS_Shared.setWQSPlayerModData("TargetRepeaterList", TargetRepeaterList)
-                print("WQS GenerateTargetRepeaterList ADDED " .. Trl.area .. " - " .. Trl.name)
-            else
-                print("WQS GenerateTargetRepeaterList CANNOT add more repeaters " .. i)
-            end
-            --print("WQS GenerateInitialTargetRepeaterList Creating TargetRepeater n "..i)
-            --print(WQS_Shared.Dump(Trl))
-        end
+    -- MP: the server owns the list. We only ask it to add entries; the result
+    -- arrives as a Sync snapshot and is shared by the whole faction.
+    for i = 1, NumTargetRepeaters, 1 do
+        WQS_Session.Send("AddRepeaterTarget", {})
+        print("WQS_MP requested target repeater " .. i .. "/" .. NumTargetRepeaters)
     end
 end
 

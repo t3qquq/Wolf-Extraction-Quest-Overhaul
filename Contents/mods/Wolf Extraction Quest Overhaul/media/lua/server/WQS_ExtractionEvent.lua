@@ -263,7 +263,10 @@ end
 local function SpawnZed(x, y, z, howmany, is_smart)
     howmany = howmany or 1
     is_smart = is_smart or true
-    is_smart = true --people complain, force disabled
+    -- was: is_smart = true --people complain, force disabled
+    -- The comment said disabled but the value said true. The server handler is
+    -- what actually forces it off, so the flag here was misleading only.
+    is_smart = false --people complain, force disabled
 
     local COGNITION_SMART = 1
     local MEMORY_LONG = 1
@@ -622,6 +625,11 @@ function WQS_OnClientCommand(WQS_module, WQS_command, WQS_player, WQS_args)
     --print("*** WQS Player WQS_OnClientCommand "..WQS_player:getDisplayName().." has send ClientCommand, module: " .. WQS_module .. "  command: " .. WQS_command);
 
     if WQS_command == "WQS_DoStartStorm" then
+        -- MP: only the first requester per extraction stage gets through,
+        -- otherwise every member restarts the weather for everyone.
+        if not WQS_MPSession.ClaimStorm(WQS_player) then
+            return
+        end
         getGameTime():setThunderDay(true)
         getClimateManager():stopWeatherAndThunder()
         --getClimateManager():triggerCustomWeatherStage(8, 1);
@@ -636,7 +644,11 @@ function WQS_OnClientCommand(WQS_module, WQS_command, WQS_player, WQS_args)
         local sq = WQS_player:getCurrentSquare()
         --playServerSound("WQSHeli1",sq)
         if sq then
-            playServerSound(WQS_args["soundname"], sq)
+            -- MP: playServerSound is a world sound, so nearby members would
+            -- otherwise hear one copy per player stacked on the same spot.
+            if WQS_MPSession.ClaimSound(WQS_args["soundname"], sq:getX(), sq:getY()) then
+                playServerSound(WQS_args["soundname"], sq)
+            end
         end
     end
 

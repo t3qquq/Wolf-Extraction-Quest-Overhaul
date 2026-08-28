@@ -16,9 +16,13 @@ WQS_STATES = {
     ["QUEST_NOT_STARTED"] = 0.8,
     ["PRE_EXTRACTION"] = 1, -- quest started
     ["EXTRACTION_CAN_BE_STARTED"] = 1.1,
+    -- MP: request gate open, this player pressed request, waiting for the faction
+    ["EXTRACTION_WAITING_REQUEST"] = 1.5,
     ["EXTRACTION_RUNNING"] = 2,
     ["EXTRACTION_CAN_BE_COMPLETED"] = 2.1,
     ["EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE"] = 2.2,
+    -- MP: timer expired and this player is in the zone, waiting for the faction
+    ["EXTRACTION_WAITING_ARRIVAL"] = 2.3,
     ["EXTRACTION_COMPLETED"] = 3,
 
     ["EXTRACTION_ENDED"] = 4
@@ -130,6 +134,14 @@ end
 
 ---ritorna il NOME (mappa.MapItem) della zona di estrazione corrente
 WQS.getCurretExtractionMap = function()
+    -- MP: the extraction point is picked once, by the server, for the whole
+    -- faction. The local random path below is only a fallback for the window
+    -- before the first Sync snapshot arrives.
+    local srvMap = WQS_Session.GetExtractionMap()
+    if srvMap and srvMap ~= "" then
+        return srvMap
+    end
+
     -- function setExtractionMap(ZoneMap,ExtractionMapList)
     local ZoneMap = SandboxVars.WQS_ZoneMap_opt or 2;
     local pl = WQS.GetCurrentPlayer();
@@ -668,22 +680,30 @@ WQS.getDistance = function(x1, y1, x2, y2)
     return math.ceil(math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2))
 end
 
+--- MP: pressing the request button no longer starts anything locally.
+--- It flips this player's ready flag on the server; the run only begins when
+--- every effective faction member is ready. Pressing again clears the flag,
+--- which is also the escape hatch if someone crashed mid gate.
 WQS.BeginExtraction = function()
-    print("BeginExtraction Prev state: " .. WQS.GetState())
-    WQS.SetState("EXTRACTION_RUNNING")
-    -- WQS_EXTRACTION_START_TIME=getTimeInMillis()
-    WQS_EXTRACTION_START_TIME = getGameTime():getMinutesStamp() -- game minutes
-    -- print("WQS_EXTRACTION_START_TIME="..WQS_EXTRACTION_START_TIME)
+    if not WQS_Session.HasFaction then
+        WQS_ModalWin(getText("IGUI_WQS_MP_NoFaction"))
+        return
+    end
+    print("WQS_MP toggle ready, prev state: " .. WQS.GetState())
+    WQS_Session.Send("ToggleReady", {})
 end
 
 WQS.CompleteExtraction = function()
     print("CompleteExtraction Prev state: " .. WQS.GetState())
+    if not WQS_Session.IsUnlocked() then
+        print("WQS_MP CompleteExtraction blocked, gate not unlocked")
+        return
+    end
     WQS.SetState("EXTRACTION_COMPLETED")
-    setShowPausedMessage(false) -- TODO da testare
+    WQS_Session.Send("Extracted", {})
+    setShowPausedMessage(false)
+    -- MP: setGameSpeed / pauseSoundAndMusic removed, the server owns time here
     WQS_ModalWin(getText("IGUI_WQS_EndModal"), WQS_GoToMenu)
-    setGameSpeed(0)
-    pauseSoundAndMusic()
-    -- WQS_FinalModalWin()
 end
 
 WQS.ContactHQ = function()
@@ -816,43 +836,72 @@ WQS.MainStatusCheck = function()
 
     local ST = WQS.getActualExtractionStats(player)
 
-    if (WQS.CurrentStateIs("PRE_EXTRACTION") or WQS.CurrentStateIs("EXTRACTION_CAN_BE_STARTED")) then
-        if ST and ST.CanRequestExtraction then
+    -- MP: keep the session snapshot fresh. Join is throttled internally and is
+    -- also what recreates our view after a reconnect.
+    WQS_Session.RequestJoin()
+
+    local sstate = WQS_Session.GetState()
+
+    -- ----------------------------------------------------------------
+    -- request gate
+    -- ----------------------------------------------------------------
+    if (sstate == "NONE") or (sstate == "PRE") or (sstate == "PENDING") then
+        if WQS_Session.IsSelfReady() then
+            WQS.SetState("EXTRACTION_WAITING_REQUEST")
+        elseif ST and ST.CanRequestExtraction then
             WQS.SetState("EXTRACTION_CAN_BE_STARTED")
         else
             WQS.SetState("PRE_EXTRACTION")
         end
+        return
     end
 
-    if (WQS.CurrentStateIs("EXTRACTION_RUNNING") or (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE")) or
-            (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED"))) then
+    -- ----------------------------------------------------------------
+    -- run in progress
+    -- ----------------------------------------------------------------
+    if (sstate == "RUNNING") or (sstate == "UNLOCKED") or (sstate == "DONE") then
         WQS_DeadlineDays = 0 -- stop countdown deadline
 
-        if not (WQS_EXTRACTION_START_TIME) then
-            -- WQS_EXTRACTION_START_TIME = getTimeInMillis()
-            WQS_EXTRACTION_START_TIME = getGameTime():getMinutesStamp() -- game minutes
+        -- the timer is authoritative on the server: never compute it locally
+        WQS_EXTRACTION_ELAPSED_TIME = WQS_Session.GetElapsedMinutes()
+        WQS_EXTRACTION_TIME_LEFT = WQS_Session.GetTimeLeftMinutes()
+        WQS_EXTRACTION_DURATION_TIME_MIN = WQS_Session.GetDurationMinutes()
+
+        -- MP: zombie spawning stays client side on purpose. Each participant
+        -- spawns around themselves, so total pressure scales with the size of
+        -- the faction, which is the intended difficulty curve. Storm and sound
+        -- are deduplicated server side in WQS_MPSession instead.
+        -- Gated so dead or already extracted members stop contributing.
+        if WQS_Session.IsSelfParticipating() then
+            WQS_ExtractionEventCheckUpdate()
         end
-        -- WQS_EXTRACTION_ELAPSED_TIME = getTimeInMillis() - WQS_EXTRACTION_START_TIME
-        WQS_EXTRACTION_ELAPSED_TIME = getGameTime():getMinutesStamp() - WQS_EXTRACTION_START_TIME
-        WQS_EXTRACTION_TIME_LEFT = WQS_EXTRACTION_DURATION_TIME_MIN - WQS_EXTRACTION_ELAPSED_TIME
 
-        -- WQS_ExtractionEvent()
-        WQS_ExtractionEventCheckUpdate()
+        if WQS.CurrentStateIs("EXTRACTION_COMPLETED") then
+            return
+        end
 
-        if WQS_EXTRACTION_TIME_LEFT <= 0 then
-            if ST.CanRequestExtraction then
-                WQS.SetState("EXTRACTION_CAN_BE_COMPLETED")
+        if WQS_Session.IsUnlocked() then
+            -- latched by the server: never falls back, so the button cannot
+            -- flicker while the horde pushes people around
+            WQS.SetState("EXTRACTION_CAN_BE_COMPLETED")
+        elseif WQS_EXTRACTION_TIME_LEFT > 0 then
+            WQS.SetState("EXTRACTION_RUNNING")
+        else
+            local me = WQS_Session.GetSelfMember()
+            if me and me.arrived then
+                WQS.SetState("EXTRACTION_WAITING_ARRIVAL")
             else
                 WQS.SetState("EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE")
             end
         end
 
+        -- MP: ConfinedMode no longer wipes this player's run. Leaving the zone
+        -- pauses the shared timer server side and progress is preserved,
+        -- so all we do here is warn.
         if (SandboxVars.WQS_ConfinedMode_opt == true) then
             if not (ST.IsInsideExtractionArea) then
                 player:Say(getText("IGUI_WQS_Out_Of_EZone"));
                 getSoundManager():playUISound("WQSBlip")
-                player:Say(getText("IGUI_WQS_Out_Of_EZone"));
-                WQS.SetState("PRE_EXTRACTION")
             end
         end
     end
