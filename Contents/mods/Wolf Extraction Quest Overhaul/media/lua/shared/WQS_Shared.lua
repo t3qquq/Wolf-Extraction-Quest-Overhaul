@@ -678,6 +678,80 @@ WQS_Shared.IsModActive = function(modId)
     return false
 end
 
+---Returns the mod id a repeater location needs, or nil when it is vanilla.
+---See media/lua/shared/WQS_RepeaterMapRequirement.lua for the table itself.
+WQS_Shared.GetRepeaterRequiredMod = function(rep)
+    if not (rep) or not (WQS_RepeaterMapRequirement) then
+        return nil
+    end
+
+    local key = tostring(rep.area) .. "|" .. tostring(rep.name)
+    local override = WQS_RepeaterMapRequirement.byRepeater[key]
+    if override ~= nil then
+        -- false means "explicitly vanilla", it has to win over the area rule
+        if override == false then
+            return nil
+        end
+        return override
+    end
+
+    return WQS_RepeaterMapRequirement.byArea[rep.area]
+end
+
+---Bounding box of every cell the world actually loaded, in world coordinates.
+---Cached: the loaded map set cannot change during a session.
+local WQS_MapBounds = nil
+
+local function WQS_GetMapBounds()
+    if WQS_MapBounds then
+        return WQS_MapBounds
+    end
+
+    local world = getWorld()
+    if not (world) then
+        return nil
+    end
+    local grid = world:getMetaGrid()
+    if not (grid) then
+        return nil
+    end
+
+    local minCx, maxCx = grid:getMinX(), grid:getMaxX()
+    local minCy, maxCy = grid:getMinY(), grid:getMaxY()
+    -- IsoMetaGrid starts with minX/minY at +10000000 and maxX/maxY at
+    -- -10000000, so an inverted box means the grid is not built yet. Do not
+    -- cache that, the caller has to fall through as "unknown".
+    if minCx > maxCx or minCy > maxCy then
+        return nil
+    end
+
+    WQS_MapBounds = {
+        x1 = minCx * 300,
+        x2 = (maxCx + 1) * 300,
+        y1 = minCy * 300,
+        y2 = (maxCy + 1) * 300,
+    }
+    print(" ### WQS map bounds x=" .. WQS_MapBounds.x1 .. ".." .. WQS_MapBounds.x2 ..
+        " y=" .. WQS_MapBounds.y1 .. ".." .. WQS_MapBounds.y2)
+    return WQS_MapBounds
+end
+
+---True when the coordinates fall inside the loaded world.
+---Safety net for repeaters whose map mod is not listed in
+---WQS_RepeaterMapRequirement: without the map, their cells are outside the
+---grid entirely. Returns true when the answer is unknown, so a missing entry
+---can only ever keep a repeater, never drop a valid one.
+WQS_Shared.IsInsideLoadedMap = function(x, y)
+    if not (x) or not (y) then
+        return true
+    end
+    local b = WQS_GetMapBounds()
+    if not (b) then
+        return true
+    end
+    return x >= b.x1 and x < b.x2 and y >= b.y1 and y < b.y2
+end
+
 ---Registra una zona di estrazione appartenente a una mappa modded.
 ---Vive qui e non piu in client/WQS.lua perche un server dedicato carica
 ---media/lua/client soltanto per il checksum (LuaManager.LoadDirBase con

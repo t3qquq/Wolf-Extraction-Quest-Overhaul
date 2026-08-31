@@ -383,25 +383,86 @@ end
 --- Ported from WQSAntenna.RemoveRepeatersTooCloseToExtrPoints, but non
 --- destructive: the original nil'd entries out of the shared WQS_RepeaterData
 --- table, permanently damaging it for every later run.
+--- Cached across calls: the pool only depends on the loaded map set and on the
+--- extraction points, neither of which changes once a session is running.
+--- AddRepeaterTarget used to rebuild the whole thing on every fragment.
+local RepeaterPoolCache = nil
+local RepeaterPoolZoneCount = -1
+
+local function CountExtractionPoints()
+    local n = 0
+    for k, v in pairs(WQS_ExtractionPointsData) do
+        n = n + 1
+    end
+    return n
+end
+
 local function BuildRepeaterPool()
+    -- Modded extraction zones are registered from OnServerStarted, so the
+    -- table can still grow after the first call. Rebuild when it does.
+    local zoneCount = CountExtractionPoints()
+    if RepeaterPoolCache and RepeaterPoolZoneCount == zoneCount then
+        return RepeaterPoolCache
+    end
+
     local pool = {}
+    local dropMod, dropBounds, dropNear = 0, 0, 0
+    local missing = {}
+
     for rk, rep in pairs(WQS_RepeaterData) do
         if rep and rep.x and rep.y then
-            local ok = true
-            for pk, pdata in pairs(WQS_ExtractionPointsData) do
-                if pdata and pdata.MapCenterAreaX and pdata.MapCenterAreaX > 0 then
-                    local dx = rep.x - pdata.MapCenterAreaX
-                    local dy = rep.y - pdata.MapCenterAreaY
-                    if math.sqrt((dx * dx) + (dy * dy)) < 130 then
-                        ok = false
+            local drop = nil
+
+            -- Gate 1: the map mod this location lives on has to be loaded.
+            local reqMod = WQS_Shared.GetRepeaterRequiredMod(rep)
+            if reqMod and not WQS_Shared.IsModActive(reqMod) then
+                drop = "mod"
+                missing[reqMod] = (missing[reqMod] or 0) + 1
+            end
+
+            -- Gate 2: safety net for locations with no requirement entry.
+            if not drop and not WQS_Shared.IsInsideLoadedMap(rep.x, rep.y) then
+                drop = "bounds"
+                print("WQS_MP WARN repeater outside loaded map, no requirement entry: area=" ..
+                    tostring(rep.area) .. " name=" .. tostring(rep.name) ..
+                    " x=" .. tostring(rep.x) .. " y=" .. tostring(rep.y))
+            end
+
+            -- Gate 3: unchanged, keep repeaters away from extraction points.
+            if not drop then
+                for pk, pdata in pairs(WQS_ExtractionPointsData) do
+                    if pdata and pdata.MapCenterAreaX and pdata.MapCenterAreaX > 0 then
+                        local dx = rep.x - pdata.MapCenterAreaX
+                        local dy = rep.y - pdata.MapCenterAreaY
+                        if math.sqrt((dx * dx) + (dy * dy)) < 130 then
+                            drop = "near_extraction"
+                        end
                     end
                 end
             end
-            if ok then
+
+            if not drop then
                 table.insert(pool, rep)
+            elseif drop == "mod" then
+                dropMod = dropMod + 1
+            elseif drop == "bounds" then
+                dropBounds = dropBounds + 1
+            else
+                dropNear = dropNear + 1
             end
         end
     end
+
+    for modId, n in pairs(missing) do
+        print("WQS_MP repeater map not installed: " .. modId .. " (" .. n .. " locations dropped)")
+    end
+    print("WQS_MP repeater pool built: usable=" .. #pool ..
+        " droppedByMissingMap=" .. dropMod ..
+        " droppedOutOfBounds=" .. dropBounds ..
+        " droppedNearExtraction=" .. dropNear)
+
+    RepeaterPoolCache = pool
+    RepeaterPoolZoneCount = zoneCount
     return pool
 end
 

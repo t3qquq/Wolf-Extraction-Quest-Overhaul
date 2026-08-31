@@ -2,3 +2,4 @@ name=Wolf Extraction Quest Overhaul
 id=WolfExtractionQuestOverhaul
 description=
 poster=poster.png
+require=RavenCreek,Xonics Mega Mall,SimonMDLVInternationalAirport,LCv2,Otr,rbr

@@ -471,49 +471,48 @@ WQS_RepeaterData = {
     },
 
 
-    -- ===== 사용자 맵 리스트에 없는 지역 (신규 주석처리) =====
+    -- ===== Dirkerdam / Cedar Hill: gated at runtime by WQS_RepeaterMapRequirement =====
+
+    {
+        ["area"] = "Dirkerdam", 
+        ["name"] = "Apartment",
+        ["x"] = 7397,
+        ["y"] = 3355,
+        ["z"] = 4,
+    },
+
+    {
+        ["area"] = "Cedar Hill", 
+        ["name"] = "Mixed-Use Building",
+        ["x"] = 4930,
+        ["y"] = 5928,
+        ["z"] = 6,
+    },
+
+    {
+        ["area"] = "Cedar Hill", 
+        ["name"] = "Mixed-Use Building2",
+        ["x"] = 4845,
+        ["y"] = 5768,
+        ["z"] = 5,
+    },
 
 
-    -- {
-        -- ["area"] = "Dirkerdam", 
-        -- ["name"] = "Apartment",
-        -- ["x"] = 7397,
-        -- ["y"] = 3355,
-        -- ["z"] = 4,
-    -- },
+    {
+        ["area"] = "Dirkerdam",
+        ["name"] = "Research Center",
+        ["x"] = 8432,
+        ["y"] = 3862,
+        ["z"] = 2,
+    },
 
-    -- {
-        -- ["area"] = "Cedar Hill", 
-        -- ["name"] = "Mixed-Use Building",
-        -- ["x"] = 4930,
-        -- ["y"] = 5928,
-        -- ["z"] = 6,
-    -- },
-
-    -- {
-        -- ["area"] = "Cedar Hill", 
-        -- ["name"] = "Mixed-Use Building2",
-        -- ["x"] = 4845,
-        -- ["y"] = 5768,
-        -- ["z"] = 5,
-    -- },
-
-
-    -- {
-        -- ["area"] = "Dirkerdam",
-        -- ["name"] = "Research Center",
-        -- ["x"] = 8432,
-        -- ["y"] = 3862,
-        -- ["z"] = 2,
-    -- },
-
-    -- {
-        -- ["area"] = "Dirkerdam",
-        -- ["name"] = "Survivor Village",
-        -- ["x"] = 10118,
-        -- ["y"] = 3438,
-        -- ["z"] = 2,
-    -- },
+    {
+        ["area"] = "Dirkerdam",
+        ["name"] = "Survivor Village",
+        ["x"] = 10118,
+        ["y"] = 3438,
+        ["z"] = 2,
+    },
 
 
     -- ===== 원래부터 주석처리되어 있던 항목 (미확인/미사용) =====
