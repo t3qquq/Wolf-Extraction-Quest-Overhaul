@@ -1,6 +1,6 @@
 version=1
-id=
+id=3791340355
 title=Wolf Extraction Quest Overhaul
-description=
+description=rework
 tags=
 visibility=unlisted
