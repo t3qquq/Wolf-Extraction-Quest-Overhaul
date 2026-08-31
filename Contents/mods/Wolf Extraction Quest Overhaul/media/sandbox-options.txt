@@ -56,6 +56,13 @@ option WQS_GameModeExtended_opt
 }
 
 
+option WQS_GroupMode_opt
+{
+	type = enum,numValues = 3,default = 1,
+	page = WQS, translation = WQS_GroupMode_txt,
+	valueTranslation = WQS_GroupMode_optlist,
+}
+
 option WQS_ZoneMap_opt
 {
 	type = enum,numValues = 10,default = 1,

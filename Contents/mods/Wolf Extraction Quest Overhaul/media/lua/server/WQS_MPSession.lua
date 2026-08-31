@@ -40,6 +40,18 @@ local ST_DONE = "DONE"         -- everyone extracted
 --- find itself in the roster.
 local SP_KEY = "@sp"
 
+--- Group modes, see sandbox option WQS_GroupMode_opt.
+local GROUP_FACTION_OR_SOLO = 1 -- faction when there is one, solo otherwise
+local GROUP_FACTION_ONLY = 2    -- faction required, no faction means no quest
+local GROUP_SAFEHOUSE = 3       -- safehouse when there is one, solo otherwise
+
+--- Session keys carry the kind that produced them. Without the prefix a
+--- faction called "Bob" and a player called "Bob" would share one session.
+local KEY_FACTION = "F:"
+local KEY_PLAYER = "P:"
+local KEY_SAFEHOUSE = "S:"
+
+
 local ANTENNA_ITEM = "wqs_radioantenna"
 local ACTIVATION_DISTANCE = 7 -- WQS_Shared.getRepeaterMaxActivationDistance()
 
@@ -108,6 +120,37 @@ end
 -- faction helpers
 -- ##############################################################
 
+---Sandbox group mode. Read at use time, never cached: the server can change
+---it between runs and there is always a default, so no fallback is needed.
+local function GetGroupMode()
+    return SandboxVars.WQS_GroupMode_opt
+end
+
+WQS_MPSession.GetGroupMode = GetGroupMode
+
+---Safehouse a player belongs to, as owner or as member.
+---SafeHouse.hasSafehouse already checks both lists, and returns the first
+---match when the server allows owning several.
+local function GetPlayerSafehouse(username)
+    if not username then
+        return nil
+    end
+    if not SafeHouse then
+        print("WQS_MP WARN SafeHouse class unavailable, group mode falls back to solo")
+        return nil
+    end
+    return SafeHouse.hasSafehouse(username)
+end
+
+---Session key of a safehouse.
+---NOT SafeHouse:getId(): that id embeds the creation timestamp
+---(x .. "," .. y .. " at " .. currentTimeMillis) and is never serialised, so
+---load() mints a brand new one on every server restart and every session
+---would be orphaned. The origin corner is stable across save/load instead.
+local function SafehouseKey(sh)
+    return KEY_SAFEHOUSE .. tostring(sh:getX()) .. "," .. tostring(sh:getY())
+end
+
 ---@return string|nil factionKey
 function WQS_MPSession.GetFactionKey(username)
     if IsSinglePlayer() then
@@ -116,41 +159,146 @@ function WQS_MPSession.GetFactionKey(username)
     if not username then
         return nil
     end
+
+    local mode = GetGroupMode()
+
+    if mode == GROUP_SAFEHOUSE then
+        local sh = GetPlayerSafehouse(username)
+        if sh then
+            return SafehouseKey(sh)
+        end
+        -- no safehouse: the player runs the quest on their own
+        return KEY_PLAYER .. username
+    end
+
     local f = Faction.getPlayerFaction(username)
-    if not f then
+    if f then
+        return KEY_FACTION .. f:getName()
+    end
+
+    if mode == GROUP_FACTION_ONLY then
         return nil
     end
-    return f:getName()
+    return KEY_PLAYER .. username
 end
 
---- NOTE: Faction.getPlayers() does NOT contain the owner (see Faction.java
---- addPlayer), so the roster must be built as {owner} + players.
-local function GetFactionRoster(factionKey)
+--- Appends {owner} + members of a java list, skipping duplicates.
+--- Both Faction.getPlayers() and SafeHouse.getPlayers() may omit the owner
+--- (see Faction.addPlayer and SafeHouse.updateSafehousePlayersConnected,
+--- which tests getPlayers().contains() OR getOwner().equals()), so the owner
+--- is always inserted first and then deduplicated.
+local function CollectRoster(owner, players)
     local out = {}
-    if factionKey == SP_KEY then
-        table.insert(out, SP_KEY)
-        return out
-    end
-    local f = Faction.getFaction(factionKey)
-    if not f then
-        return out
-    end
     local seen = {}
-    local owner = f:getOwner()
     if owner then
         table.insert(out, owner)
         seen[owner] = true
     end
-    local pls = f:getPlayers()
-    if pls then
-        for i = 0, pls:size() - 1 do
-            local u = pls:get(i)
+    if players then
+        for i = 0, players:size() - 1 do
+            local u = players:get(i)
             if u and not seen[u] then
                 table.insert(out, u)
                 seen[u] = true
             end
         end
     end
+    return out
+end
+
+--- Finds a safehouse back from its session key.
+--- Kept keyed by origin corner rather than held as an object reference,
+--- because the safehouse list is rebuilt on load.
+--- SafeHouse.canBeSafehouse does NOT reject a building that is already
+--- claimed, and addSafeHouse derives the corner from the building def, so two
+--- players claiming the same building produce two safehouses with identical
+--- coordinates. They would silently share one session, so the collision is
+--- reported instead of being papered over.
+local function GetSafehouseByKey(factionKey)
+    if not SafeHouse then
+        return nil
+    end
+    local list = SafeHouse.getSafehouseList()
+    if not list then
+        return nil
+    end
+    local found = nil
+    local hits = 0
+    for i = 0, list:size() - 1 do
+        local sh = list:get(i)
+        if sh and SafehouseKey(sh) == factionKey then
+            hits = hits + 1
+            if not found then
+                found = sh
+            end
+        end
+    end
+    if hits > 1 then
+        print("WQS_MP WARN " .. hits .. " safehouses share the origin " .. tostring(factionKey) ..
+            ", their members end up in one session")
+    end
+    return found
+end
+
+--- True when the group behind a session key no longer exists.
+--- The key carries a prefix now, so it can never be handed to
+--- Faction.getFaction as is: that would report every session as gone and the
+--- poll loop would destroy all of them on the next tick.
+--- A solo session has no backing group and therefore never expires here.
+local function IsGroupGone(factionKey)
+    if factionKey == SP_KEY then
+        return false
+    end
+
+    local kind = string.sub(factionKey, 1, 2)
+    local rest = string.sub(factionKey, 3)
+
+    if kind == KEY_PLAYER then
+        return false
+    end
+    if kind == KEY_SAFEHOUSE then
+        return GetSafehouseByKey(factionKey) == nil
+    end
+    if kind == KEY_FACTION then
+        return Faction.getFaction(rest) == nil
+    end
+    return false
+end
+local function GetFactionRoster(factionKey)
+    local out = {}
+    if factionKey == SP_KEY then
+        table.insert(out, SP_KEY)
+        return out
+    end
+
+    local kind = string.sub(factionKey, 1, 2)
+    local rest = string.sub(factionKey, 3)
+
+    -- solo session: the roster is exactly the one player
+    if kind == KEY_PLAYER then
+        table.insert(out, rest)
+        return out
+    end
+
+    if kind == KEY_SAFEHOUSE then
+        local sh = GetSafehouseByKey(factionKey)
+        if not sh then
+            -- safehouse gone (destroyed or released): leave the roster empty,
+            -- SyncRoster prunes the session down and the gates stop waiting
+            return out
+        end
+        return CollectRoster(sh:getOwner(), sh:getPlayers())
+    end
+
+    if kind == KEY_FACTION then
+        local f = Faction.getFaction(rest)
+        if not f then
+            return out
+        end
+        return CollectRoster(f:getOwner(), f:getPlayers())
+    end
+
+    print("WQS_MP WARN unknown session key kind: " .. tostring(factionKey))
     return out
 end
 
@@ -962,8 +1110,7 @@ local function PollSessions()
         -- removed during the loop still comes back with a nil value
         if sess then
             local changed = false
-            local gone = (factionKey ~= SP_KEY) and anyoneOnline and
-                (Faction.getFaction(factionKey) == nil)
+            local gone = anyoneOnline and IsGroupGone(factionKey)
 
             if gone then
                 DestroySession(factionKey, "faction no longer exists")
