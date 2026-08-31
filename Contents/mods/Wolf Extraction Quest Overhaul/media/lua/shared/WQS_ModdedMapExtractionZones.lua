@@ -30,8 +30,14 @@ function WQS_ModdedMapExtractionZoneInit()
     --- instead of the standard random ones, do not put this over 80
     PrefSpawnPointsPerc = 70
 
-    WQS.AddModdedMapExtractionZone(ModMapId, ZoneLabel, ModMapFolder, ExtrPointX, ExtrPointY, ExtrPointZ,
+    WQS_Shared.AddModdedMapExtractionZone(ModMapId, ZoneLabel, ModMapFolder, ExtrPointX, ExtrPointY, ExtrPointZ,
         PrefSpawnPointList, PrefSpawnPointsPerc)
 end
 
+--- OnGameStart is fired from IngameState, which a dedicated server never runs:
+--- the modded zones were registered on the clients only, so PickExtractionMap
+--- on the server could not see them and they were silently unreachable in MP.
+--- OnServerStarted is the server side counterpart (GameServer). The registration
+--- itself is idempotent, so a coop host firing both is harmless.
 Events.OnGameStart.Add(WQS_ModdedMapExtractionZoneInit);
+Events.OnServerStarted.Add(WQS_ModdedMapExtractionZoneInit);

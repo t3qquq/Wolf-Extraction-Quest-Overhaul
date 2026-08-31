@@ -126,10 +126,15 @@ function WQS_AntennaGui:onClickMainActionBut()
     --print("onClickMainActionBut "..tostring(self.infoList.SelectedData.RandomZoneOpt))
     local selData = self.infoList.SelectedData
     if (selData) and (selData.MapItem) and (selData.RandomZoneOpt) then
-        WQS.setCurretExtractionMap(selData.MapItem, selData.RandomZoneOpt)
+        -- The extraction zone belongs to the faction session, not to the caller.
+        -- setCurretExtractionMap only ever wrote the caller's own ModData, which
+        -- nothing reads anymore, so the choice was silently discarded.
+        WQS_Session.Send("SetExtractionMap", { item = selData.MapItem, randOpt = selData.RandomZoneOpt })
         WQS.SetQuestAsStarted()
         self:close();
         local ln = " <LINE> "
+        -- the confirmed zone arrives with the next snapshot, so the modal shows
+        -- the label only when it is already known
         local cmap = WQS.getExtractionData(WQS.getCurretExtractionMap())
         local MapLabel = ""
         if (cmap) and (cmap.MapGuiLabel) then

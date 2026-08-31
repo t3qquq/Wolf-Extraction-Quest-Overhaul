@@ -125,7 +125,306 @@ WQS_Shared.getRepeaterMaxActivationDistance = function()
     return ret
 end
 
+-- ##############################################################
+-- MP SESSION SNAPSHOT (server authoritative)
+--
+-- The faction session lives on the server (server/WQS_MPSession.lua).
+-- This client side cache holds the last snapshot pushed by the server and
+-- exposes it read only. Nothing here may mutate session state: every change
+-- goes through WQS_Session.Send and comes back as a new snapshot.
+-- ##############################################################
+
+WQS_Session = {}
+
+WQS_Session.MODULE = "WQS_MP"
+WQS_Session.Data = nil
+WQS_Session.HasFaction = true
+WQS_Session.LastJoinAttempt = 0
+WQS_Session.NoFactionUntil = 0
+
+--- Singleplayer stand in for both the faction key and the username.
+--- Must match SP_KEY in server/WQS_MPSession.lua: the client finds itself in
+--- the roster by name, and IsoPlayer:getUsername() is "Bob" by default in SP.
+WQS_Session.SP_USER = "@sp"
+
+WQS_Session.IsSinglePlayer = function()
+    return (not isClient()) and (not isServer())
+end
+
+WQS_Session.Get = function()
+    return WQS_Session.Data
+end
+
+WQS_Session.IsReady = function()
+    return WQS_Session.Data ~= nil
+end
+
+WQS_Session.GetState = function()
+    if not WQS_Session.Data then
+        return "NONE"
+    end
+    return WQS_Session.Data.state
+end
+
+WQS_Session.IsUnlocked = function()
+    local s = WQS_Session.GetState()
+    return (s == "UNLOCKED") or (s == "DONE")
+end
+
+WQS_Session.IsRunning = function()
+    return WQS_Session.GetState() == "RUNNING"
+end
+
+WQS_Session.IsPending = function()
+    return WQS_Session.GetState() == "PENDING"
+end
+
+WQS_Session.GetSelfName = function()
+    if WQS_Session.IsSinglePlayer() then
+        return WQS_Session.SP_USER
+    end
+    local pl = WQS.GetCurrentPlayer()
+    if not pl then
+        return nil
+    end
+    return pl:getUsername()
+end
+
+WQS_Session.GetSelfMember = function()
+    local d = WQS_Session.Data
+    if not d or not d.members then
+        return nil
+    end
+    local me = WQS_Session.GetSelfName()
+    for i = 1, #d.members do
+        if d.members[i].u == me then
+            return d.members[i]
+        end
+    end
+    return nil
+end
+
+WQS_Session.IsSelfReady = function()
+    local m = WQS_Session.GetSelfMember()
+    return (m ~= nil) and (m.ready == true)
+end
+
+--- True only while this player is a live participant of a running session.
+--- The extraction event loop (zombie spawning) is gated on this: a dead or
+--- already extracted member must not keep spawning for the rest of the team.
+WQS_Session.IsSelfParticipating = function()
+    if not WQS_Session.IsRunning() and not WQS_Session.IsUnlocked() then
+        return false
+    end
+    local m = WQS_Session.GetSelfMember()
+    if not m then
+        return false -- dead or dropped from the effective roster
+    end
+    if m.extracted then
+        return false
+    end
+    return true
+end
+
+WQS_Session.GetReadyCount = function()
+    local d = WQS_Session.Data
+    if not d then return 0 end
+    return d.readyCount or 0
+end
+
+WQS_Session.GetReadyTotal = function()
+    local d = WQS_Session.Data
+    if not d then return 0 end
+    return d.readyTotal or 0
+end
+
+WQS_Session.GetArrivedCount = function()
+    local d = WQS_Session.Data
+    if not d then return 0 end
+    return d.arrivedCount or 0
+end
+
+WQS_Session.GetArrivedTotal = function()
+    local d = WQS_Session.Data
+    if not d then return 0 end
+    return d.arrivedTotal or 0
+end
+
+WQS_Session.GetElapsedMinutes = function()
+    local d = WQS_Session.Data
+    if not d then return 0 end
+    return d.elapsed or 0
+end
+
+WQS_Session.GetDurationMinutes = function()
+    local d = WQS_Session.Data
+    if not d then return 0 end
+    return d.duration or 0
+end
+
+WQS_Session.GetTimeLeftMinutes = function()
+    return WQS_Session.GetDurationMinutes() - WQS_Session.GetElapsedMinutes()
+end
+
+WQS_Session.GetExtractionMap = function()
+    local d = WQS_Session.Data
+    if not d then return nil end
+    return d.map
+end
+
+--- Roster line for the tracker: green = condition met, red = still missing.
+--- Which condition is coloured depends on the gate currently open.
+WQS_Session.GetMemberRosterTxt = function(useArrived)
+    local d = WQS_Session.Data
+    if not d or not d.members or #d.members == 0 then
+        return ""
+    end
+    local ret = ""
+    for i = 1, #d.members do
+        local m = d.members[i]
+        local ok = false
+        if useArrived then
+            ok = m.arrived
+        else
+            ok = m.ready
+        end
+        if ok then
+            ret = ret .. WQS_COLGREEN .. m.u .. WQS_COLWHITE .. "  "
+        else
+            ret = ret .. WQS_COLRED .. m.u .. WQS_COLWHITE .. "  "
+        end
+    end
+    return ret
+end
+
+--- Sends a command to the session host.
+--- In MP that is the server, over the wire. In SP the host module lives in
+--- this same Lua state and no event would ever deliver a client command, so
+--- the call is handed over directly. Without this branch the whole mod was
+--- dead in singleplayer: every command was dropped and the snapshot stayed nil
+--- forever, which pinned the state machine at "NONE".
+WQS_Session.Send = function(command, args)
+    if isClient() then
+        sendClientCommand(WQS_Session.MODULE, command, args or {})
+        return true
+    end
+    if isServer() then
+        print("WQS_MP Send ignored, this is the server: " .. tostring(command))
+        return false
+    end
+    if WQS_MPSession and WQS_MPSession.LocalCommand then
+        WQS_MPSession.LocalCommand(command, args or {})
+        return true
+    end
+    print("WQS_MP Send failed, session module not loaded yet: " .. tostring(command))
+    return false
+end
+
+--- Join is both the first contact and the reconnect repair path.
+--- It used to fire every few seconds forever; the server pushes changes on its
+--- own, so once a snapshot is held this is only a slow heartbeat. A player
+--- with no faction backs off entirely instead of filling the server log.
+WQS_Session.RequestJoin = function()
+    local now = getTimeInMillis()
+
+    if (not WQS_Session.HasFaction) and (now < WQS_Session.NoFactionUntil) then
+        return
+    end
+
+    local wait = 3000
+    if WQS_Session.Data ~= nil then
+        wait = 30000
+    end
+    if (now - WQS_Session.LastJoinAttempt) < wait then
+        return
+    end
+    WQS_Session.LastJoinAttempt = now
+    WQS_Session.Send("Join", {})
+end
+
+--- Overridden by the client files that own the matching UI feedback.
+--- Defined here so the dedicated server, which never loads media/lua/client,
+--- can still route a message without blowing up.
+WQS_Session.OnAddTargetResult = function(ok, args) end
+WQS_Session.OnReadyRejected = function(args) end
+
+WQS_Session.OnServerMessage = function(command, args)
+    if command == "Sync" then
+        WQS_Session.HasFaction = true
+        WQS_Session.Data = args
+    elseif command == "NoFaction" then
+        WQS_Session.HasFaction = false
+        WQS_Session.Data = nil
+        WQS_Session.NoFactionUntil = getTimeInMillis() + 30000
+        print("WQS_MP client: not in a faction, extraction is locked")
+    elseif command == "AddTargetOk" then
+        WQS_Session.OnAddTargetResult(true, args or {})
+    elseif command == "AddTargetFailed" then
+        WQS_Session.OnAddTargetResult(false, args or {})
+    elseif command == "ReadyRejected" then
+        WQS_Session.OnReadyRejected(args or {})
+    end
+end
+
+local function WQS_Session_OnServerCommand(module, command, args)
+    if module ~= WQS_Session.MODULE then
+        return
+    end
+    WQS_Session.OnServerMessage(command, args)
+end
+
+if isClient() then
+    Events.OnServerCommand.Add(WQS_Session_OnServerCommand)
+end
+
+--- Legacy shape adapters.
+--- The rest of the mod still reads "TargetRepeaterList" / "ActiveRepeaterList"
+--- through getWQSPlayerModData in about 30 places. Instead of touching every
+--- call site, those two keys are transparently served from the session
+--- snapshot, so the read paths keep working unchanged.
+local function SessionTargetsToLegacy()
+    local d = WQS_Session.Data
+    if not d or not d.targets then
+        return {}
+    end
+    local out = {}
+    for i = 1, #d.targets do
+        local t = d.targets[i]
+        out[i] = { area = t.area, name = t.name, x = t.x, y = t.y, z = t.z }
+    end
+    return out
+end
+
+local function SessionActiveToLegacy()
+    local d = WQS_Session.Data
+    if not d or not d.targets then
+        return {}
+    end
+    local out = {}
+    for i = 1, #d.targets do
+        local t = d.targets[i]
+        if t.active then
+            out["srv" .. tostring(i)] = {
+                x = t.x,
+                y = t.y,
+                z = t.z,
+                by = t.by,
+                activeForTargetRep = { area = t.area, name = t.name, x = t.x, y = t.y, z = t.z }
+            }
+        end
+    end
+    return out
+end
+
 WQS_Shared.getWQSPlayerModData = function(key)
+    -- session owned keys never touch player ModData anymore
+    if key == "TargetRepeaterList" then
+        return SessionTargetsToLegacy()
+    end
+    if key == "ActiveRepeaterList" then
+        return SessionActiveToLegacy()
+    end
+
     local pl = WQS.GetCurrentPlayer();
     if not (pl) then
         return false
@@ -141,6 +440,12 @@ end
 ---setta una sottochiave di ModData[WQS] al valore indicato ModData.WQS.key=val
 ---WQS_Shared.setWQSPlayerModData("test","ciao") -> ModData.WQS.test="ciao"
 WQS_Shared.setWQSPlayerModData = function(key, val)
+    -- session owned keys are read only on the client: the server decides
+    if key == "TargetRepeaterList" or key == "ActiveRepeaterList" then
+        print("WQS_MP WARN blocked local write to server owned key: " .. tostring(key))
+        return false
+    end
+
     local pl = WQS.GetCurrentPlayer();
 
     if not (pl) then
@@ -154,6 +459,10 @@ end
 ---cancella una sottochiave di ModData[WQS] -> ModData.WQS.key=nil
 ---WQS_Shared.deleteWQSPlayerModData("test") -> ModData.WQS.test <- viene rimossa
 WQS_Shared.deleteWQSPlayerModData = function(key)
+    if key == "TargetRepeaterList" or key == "ActiveRepeaterList" then
+        print("WQS_MP WARN blocked local delete of server owned key: " .. tostring(key))
+        return false
+    end
     local pl = WQS.GetCurrentPlayer();
     if not (pl) then
         return false
@@ -207,23 +516,25 @@ end
 ---@param t table
 ---@return table element
 WQS_Shared.PickRandomObjFromTableIfNotNil = function(t)
-    local rr = 1
-    if (ZombRand) then
-        rr = ZombRand(#t) + 1
-    else
-        rr = math.random(1, #t)
+    if not (t) or (#t == 0) then
+        return nil
     end
-    --local rr = math.random(1, #t)
-    local retval = nil
-    --print(rr .. " > " .. tostring(t[rr]))
-    if t[rr] then
-        --print("ret " .. rr .. " " .. tostring(t[rr]))
-        retval = t[rr]
-    else
-        --print("again " .. rr .. " " .. tostring(t[rr]))
-        retval = WQS_Shared.PickRandomObjFromTableIfNotNil(t)
+    -- Kahlua does not implement math.random, so the old fallback branch was a
+    -- "tried to call nil" waiting for ZombRand to go missing. ZombRand is the
+    -- only random source that exists here. The unbounded recursion is gone
+    -- too: a table of holes used to blow the stack.
+    for i = 1, 50 do
+        local rr = ZombRand(#t) + 1
+        if t[rr] then
+            return t[rr]
+        end
     end
-    return retval
+    for i = 1, #t do
+        if t[i] then
+            return t[i]
+        end
+    end
+    return nil
 end
 
 -- riceve un numero da 0 a 100, estrae un num casuale tra 1 e 100, ritorna true se il num estratto è inferiore alla percentuale
@@ -340,6 +651,78 @@ WQS_Shared.IsCurretExtractionOnModdedMap = function()
     --     return true
     -- end
     -- return false
+end
+
+---Riceve un mod id e ritorna true se quella mod è attiva.
+---ActiveMods("currentGame") viene popolato solo dal client: su un server
+---dedicato getById crea un record vuoto e isModActive risponde sempre false.
+---getActivatedMods è la lista che il server stesso ha caricato.
+WQS_Shared.IsModActive = function(modId)
+    if not (modId) then
+        return false
+    end
+    local mods = getActivatedMods()
+    if mods then
+        for i = 0, mods:size() - 1 do
+            if mods:get(i) == modId then
+                return true
+            end
+        end
+    end
+    if ActiveMods then
+        local am = ActiveMods.getById("currentGame")
+        if am and am:isModActive(modId) then
+            return true
+        end
+    end
+    return false
+end
+
+---Registra una zona di estrazione appartenente a una mappa modded.
+---Vive qui e non piu in client/WQS.lua perche un server dedicato carica
+---media/lua/client soltanto per il checksum (LuaManager.LoadDirBase con
+---skipRun), quindi la tabella WQS non esiste affatto sul server e la zona
+---non entrava mai fra i candidati di PickExtractionMap.
+WQS_Shared.AddModdedMapExtractionZone = function(ModMapId, ZoneLabel, ModMapFolder, X, Y, Z, PrefSpawnPointList,
+                                                 PrefSpawnPointsPerc)
+    if not (ModMapId) or not (ZoneLabel) or not (X) or not (Y) then
+        print(" ### WQS AddModdedMapExtractionZone ERROR : some params are nil")
+        return false
+    end
+
+    local Radius = 8
+    local PrefZlevelSpawn = nil
+    Z = Z or 0
+    PrefSpawnPointsPerc = PrefSpawnPointsPerc or nil
+    PrefSpawnPointList = PrefSpawnPointList or {}
+
+    if not (WQS_Shared.IsModActive(ModMapId)) then
+        return false
+    end
+
+    local MyId = ZoneLabel:gsub(" ", "-") .. "-" .. X .. "-" .. Y .. "-" .. Z
+    local ZoneId = "#modded_map#" .. ModMapId .. "_" .. MyId
+
+    -- OnGameStart can fire more than once (respawn, lua reload) and the server
+    -- registers from OnServerStarted as well, so this has to be idempotent
+    for k, v in pairs(WQS_ExtractionPointsData) do
+        if v and (v.MapItem == ZoneId) then
+            return false
+        end
+    end
+
+    local ExtrData = ExtractionMap.new(ZoneId, X, Y, Z, ZoneLabel, Radius, PrefZlevelSpawn, PrefSpawnPointsPerc,
+        ModMapFolder)
+    table.insert(WQS_ExtractionPointsData, ExtrData)
+    print(" ### WQS AddModdedMapExtractionZone -> Added <" .. ZoneLabel ..
+        "> from mod " .. ModMapId .. " ZoneId=" .. ZoneId)
+
+    if not (WQS_Shared.TableIsEmptyOrNil(PrefSpawnPointList)) then
+        WQS_PreferredSpawnPointsData[ZoneId] = PrefSpawnPointList
+        print(" ### WQS AddModdedMapExtractionZone -> Added PreferredSpawnPointsData key=" ..
+            ZoneId .. " n. values=" .. #PrefSpawnPointList)
+    end
+    return true
 end
 
 WQS_Shared.IsModdedMap = function(MapId)

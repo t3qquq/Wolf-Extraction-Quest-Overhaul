@@ -1,39 +1,75 @@
 WQS_Recipe = {}
 
+--- Number of fragments the "Assemble & update repeater map" recipe eats.
+--- Must match WQS_recipe.txt.
+WQS_Recipe.FRAGMENTS_PER_REQUEST = 4
+WQS_Recipe.PendingTargetRequest = nil
+
 function WQS_Recipe.DrawExtractionMap(recipe, result, player)
-    --player:Say("DrawExtractionMap");
-    -- local CurrentMapId = string.lower(tostring(WQS.getCurretExtractionMap()))
-    -- local is_modded_str="#modded_map#"
-    -- local is_modded_map = CurrentMapId:find(is_modded_str, 1, true)
+    local cmapId = WQS.getCurretExtractionMap()
+    if not (cmapId) then
+        -- the session has not told us the zone yet
+        player:Say(getText("IGUI_WQS_MP_NoZoneYet"))
+        return
+    end
 
     if not (WQS_Shared.IsCurretExtractionOnModdedMap()) then
         local inv = player:getInventory();
-        local extraction_map = inv:AddItem(tostring(WQS.getCurretExtractionMap()));
+        local extraction_map = inv:AddItem(tostring(cmapId));
         if extraction_map then
-            local cmap = WQS.getExtractionData(WQS.getCurretExtractionMap())
+            local cmap = WQS.getExtractionData(cmapId)
             if cmap then
                 extraction_map:setName(cmap.MapGuiLabel .. " " .. getText("IGUI_WQS_ExtrMapLabel"))
             end
         end
     else
-        player:Say("I can't orient myself, a strange map to draw!")
+        player:Say(getText("IGUI_WQS_MP_ModdedMapNoDraw"))
     end
 end
 
+--- The recipe has already consumed the fragments by the time this runs, so the
+--- client cannot decide anything here on its own. It used to gate on
+--- CanAddMoreTargetRepeaters, evaluated against a snapshot up to two seconds
+--- old: two members crafting inside that window both saw a free slot, both said
+--- "location added", and the server quietly dropped one of the two crafts.
+--- Now the session answers, and a refusal refunds the fragments.
 function WQS_Recipe.GenerateTargetRepeater(recipe, result, player)
-    print("GenerateTargetRepeater")
-    if WQS_Shared.IsActiveRepeatersMode() then
-        if WQSAntenna.CanAddMoreTargetRepeaters() then
-            WQSAntenna.GenerateTargetRepeaterList(true, false, 1)
-            player:Say(getText("IGUI_WQS_TargetAntennaRepeaterLocationAdded"))
-        else
-            player:Say(getText("IGUI_WQS_HaveAllTargetAntennaRepeaterLocations"))
-        end
-        if not (WQS_Shared.HaveItemInInventory(WQS_Shared.getRepeaterDynamicMapItemId(true))) then
-            local inv = player:getInventory();
-            local extraction_map = inv:AddItem(tostring(WQS_Shared.getRepeaterDynamicMapItemId(true)));
-        end
+    print("WQS_MP target repeater requested")
+    if not (WQS_Shared.IsActiveRepeatersMode()) then
+        return
     end
+
+    WQS_Recipe.PendingTargetRequest = player
+    WQS_Session.Send("AddRepeaterTarget", {})
+
+    if not (WQS_Shared.HaveItemInInventory(WQS_Shared.getRepeaterDynamicMapItemId(true))) then
+        local inv = player:getInventory();
+        inv:AddItem(tostring(WQS_Shared.getRepeaterDynamicMapItemId(true)));
+    end
+end
+
+WQS_Session.OnAddTargetResult = function(ok, args)
+    local player = WQS_Recipe.PendingTargetRequest or WQS.GetCurrentPlayer()
+    WQS_Recipe.PendingTargetRequest = nil
+    if not (player) then
+        return
+    end
+
+    if ok then
+        player:Say(getText("IGUI_WQS_TargetAntennaRepeaterLocationAdded"))
+        return
+    end
+
+    local reason = args and args.reason or ""
+    player:getInventory():AddItems(WQS_Shared.getRepeaterFragmentLocationItemId(true),
+        WQS_Recipe.FRAGMENTS_PER_REQUEST)
+
+    if reason == "full" then
+        player:Say(getText("IGUI_WQS_HaveAllTargetAntennaRepeaterLocations"))
+    else
+        player:Say(getText("IGUI_WQS_MP_TargetRequestFailed"))
+    end
+    print("WQS_MP target request rejected reason=" .. tostring(reason) .. ", fragments refunded")
 end
 
 --[[ require "ISUI/ISCollapsableWindow"

@@ -16,9 +16,13 @@ WQS_STATES = {
     ["QUEST_NOT_STARTED"] = 0.8,
     ["PRE_EXTRACTION"] = 1, -- quest started
     ["EXTRACTION_CAN_BE_STARTED"] = 1.1,
+    -- MP: request gate open, this player pressed request, waiting for the faction
+    ["EXTRACTION_WAITING_REQUEST"] = 1.5,
     ["EXTRACTION_RUNNING"] = 2,
     ["EXTRACTION_CAN_BE_COMPLETED"] = 2.1,
     ["EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE"] = 2.2,
+    -- MP: timer expired and this player is in the zone, waiting for the faction
+    ["EXTRACTION_WAITING_ARRIVAL"] = 2.3,
     ["EXTRACTION_COMPLETED"] = 3,
 
     ["EXTRACTION_ENDED"] = 4
@@ -129,47 +133,18 @@ end
 
 
 ---ritorna il NOME (mappa.MapItem) della zona di estrazione corrente
+--- The extraction point belongs to the session (the server in MP, the local
+--- host module in SP) and is picked exactly once, for everybody.
+--- Rolling a local random while waiting for the first snapshot used to persist
+--- a zone nobody else agreed on into ModData, which handed out the physical map
+--- of the wrong zone to anyone crafting during the 2-5s login window.
+--- Returning nil is the honest answer: callers treat it as "not known yet".
 WQS.getCurretExtractionMap = function()
-    -- function setExtractionMap(ZoneMap,ExtractionMapList)
-    local ZoneMap = SandboxVars.WQS_ZoneMap_opt or 2;
-    local pl = WQS.GetCurrentPlayer();
-
-    if not (pl) then
-        return nil
+    local srvMap = WQS_Session.GetExtractionMap()
+    if srvMap and srvMap ~= "" then
+        return srvMap
     end
-
-    local myModData = pl:getModData();
-    local ZoneMap_random_opt = SandboxVars.WQS_ZoneMap_random_opt or 1;
-
-    local ExtractionMapList = WQS_Shared.getExtractionPointsData()
-
-    local extraction_map = nil
-
-    -- print(" ### WQS setExtractionMap key=" .. ZoneMap .. " ZoneMap_random_opt=" .. tostring(ZoneMap_random_opt))
-    if not (myModData.PlayerExtractionMap == nil) then
-        extraction_map = myModData.PlayerExtractionMap
-        sbxval = ExtractionMapList[ZoneMap].MapItem
-        -- print(" ### WQS ZoneMap from PlayerModData" .. tostring(extraction_map) .. " SandboxVal=" .. sbxval);
-    else
-        local randopt = "fixed"
-
-        -- random all zones
-        if (ZoneMap_random_opt == 1) then
-            randopt = "random_all_zones"
-        end
-        -- Random only Louisville zones
-        if (ZoneMap_random_opt == 2) then
-            randopt = "random_only_louisville"
-        end
-        -- Random excluding Louisville zones
-        if (ZoneMap_random_opt == 3) then
-            randopt = "random_excluding_louisville"
-        end
-
-        extraction_map = WQS.setCurretExtractionMap(ExtractionMapList[ZoneMap].MapItem, randopt)
-    end
-    -- print (extraction_map)
-    return extraction_map
+    return nil
 end
 
 
@@ -296,10 +271,15 @@ WQS.getActualExtractionStats = function(player)
     ret.SignalStrenght_needed = 0 -- deve essere 0 qui
 
     local CurretExtractionMap = WQS.getCurretExtractionMap()
+    if not (CurretExtractionMap) then
+        -- no session snapshot yet, nothing can be evaluated
+        return {}
+    end
+
     local MapData = WQS.getExtractionData(CurretExtractionMap)
 
     if (MapData == nil) then
-        print(" #### WQS ERROR MapData is NIL: " .. CurretExtractionMap)
+        print(" #### WQS ERROR MapData is NIL: " .. tostring(CurretExtractionMap))
         return {}
     end
 
@@ -324,7 +304,10 @@ WQS.getActualExtractionStats = function(player)
     local dir = WQS_Shared.CardinalDirTxt(player, MapData.MapCenterAreaX, MapData.MapCenterAreaY, ret.Distance_val)
     ret.CardinalDir = dir or ""
     ret.Zlevel_val = MapData.MapCenterAreaZ
-    if (player:getZ() == MapData.MapCenterAreaZ) then
+    -- floored on both sides: comparing a float getZ() to an int with == made
+    -- the client paint "wrong elevation" in red while the server counted the
+    -- same player as arrived, on stairs and ramps
+    if (math.floor(player:getZ() + 0.5) == MapData.MapCenterAreaZ) then
         ret.Zlevel_isok = true
         -- player:Say("The height level is wrong! "..tostring(player:getZ()).." -> "..MapData.MapCenterAreaZ );
     end
@@ -668,22 +651,35 @@ WQS.getDistance = function(x1, y1, x2, y2)
     return math.ceil(math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2))
 end
 
+--- MP: pressing the request button no longer starts anything locally.
+--- It flips this player's ready flag on the server; the run only begins when
+--- every effective faction member is ready. Pressing again clears the flag,
+--- which is also the escape hatch if someone crashed mid gate.
 WQS.BeginExtraction = function()
-    print("BeginExtraction Prev state: " .. WQS.GetState())
-    WQS.SetState("EXTRACTION_RUNNING")
-    -- WQS_EXTRACTION_START_TIME=getTimeInMillis()
-    WQS_EXTRACTION_START_TIME = getGameTime():getMinutesStamp() -- game minutes
-    -- print("WQS_EXTRACTION_START_TIME="..WQS_EXTRACTION_START_TIME)
+    if not WQS_Session.HasFaction then
+        WQS_ModalWin(getText("IGUI_WQS_MP_NoFaction"))
+        return
+    end
+    print("WQS_MP toggle ready, prev state: " .. WQS.GetState())
+    WQS_Session.Send("ToggleReady", {})
 end
 
 WQS.CompleteExtraction = function()
     print("CompleteExtraction Prev state: " .. WQS.GetState())
+    if not WQS_Session.IsUnlocked() then
+        print("WQS_MP CompleteExtraction blocked, gate not unlocked")
+        return
+    end
     WQS.SetState("EXTRACTION_COMPLETED")
-    setShowPausedMessage(false) -- TODO da testare
+    WQS_Session.Send("Extracted", {})
+    setShowPausedMessage(false)
     WQS_ModalWin(getText("IGUI_WQS_EndModal"), WQS_GoToMenu)
-    setGameSpeed(0)
-    pauseSoundAndMusic()
-    -- WQS_FinalModalWin()
+    -- In MP the world keeps running for everyone else, so freezing it is not an
+    -- option. In SP the original ending still pauses the game behind the modal.
+    if WQS_Session.IsSinglePlayer() then
+        setGameSpeed(0)
+        pauseSoundAndMusic()
+    end
 end
 
 WQS.ContactHQ = function()
@@ -762,10 +758,11 @@ WQS.getExtractionData = function(MapItemName)
             -- print("Found "..MapListData[k].PreferredZlevelSpawn)
         end
     end
-    -- (misura estrema) se non trovo i dati di estrazione per la key passata setto una estrazione casuale
+    -- was: fall back to setCurretExtractionMap("random"), which wrote a zone
+    -- into the player ModData behind the session's back. The session owns the
+    -- zone now, so a miss here is a data error and nothing else.
     if not (ret) then
-        print(" ### WQS ERROR getExtractionData : MapData not found for key=" .. MapItemName .. ", setting it randomly");
-        WQS.setCurretExtractionMap("random")
+        print(" ### WQS ERROR getExtractionData : MapData not found for key=" .. tostring(MapItemName));
     end
 
     return ret
@@ -814,45 +811,75 @@ WQS.MainStatusCheck = function()
         return nil
     end
 
-    local ST = WQS.getActualExtractionStats(player)
+    -- Ask for the snapshot first: getActualExtractionStats needs the session
+    -- extraction map, so on the very first ticks it would evaluate nothing.
+    -- Join is throttled internally and is also what repairs our view after a
+    -- reconnect or a faction change.
+    WQS_Session.RequestJoin()
 
-    if (WQS.CurrentStateIs("PRE_EXTRACTION") or WQS.CurrentStateIs("EXTRACTION_CAN_BE_STARTED")) then
-        if ST and ST.CanRequestExtraction then
+    local ST = WQS.getActualExtractionStats(player)
+    local sstate = WQS_Session.GetState()
+
+    -- ----------------------------------------------------------------
+    -- request gate
+    -- ----------------------------------------------------------------
+    if (sstate == "NONE") or (sstate == "PRE") or (sstate == "PENDING") then
+        if WQS_Session.IsSelfReady() then
+            WQS.SetState("EXTRACTION_WAITING_REQUEST")
+        elseif ST and ST.CanRequestExtraction then
             WQS.SetState("EXTRACTION_CAN_BE_STARTED")
         else
             WQS.SetState("PRE_EXTRACTION")
         end
+        return
     end
 
-    if (WQS.CurrentStateIs("EXTRACTION_RUNNING") or (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE")) or
-            (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED"))) then
+    -- ----------------------------------------------------------------
+    -- run in progress
+    -- ----------------------------------------------------------------
+    if (sstate == "RUNNING") or (sstate == "UNLOCKED") or (sstate == "DONE") then
         WQS_DeadlineDays = 0 -- stop countdown deadline
 
-        if not (WQS_EXTRACTION_START_TIME) then
-            -- WQS_EXTRACTION_START_TIME = getTimeInMillis()
-            WQS_EXTRACTION_START_TIME = getGameTime():getMinutesStamp() -- game minutes
+        -- the timer is authoritative on the server: never compute it locally
+        WQS_EXTRACTION_ELAPSED_TIME = WQS_Session.GetElapsedMinutes()
+        WQS_EXTRACTION_TIME_LEFT = WQS_Session.GetTimeLeftMinutes()
+        WQS_EXTRACTION_DURATION_TIME_MIN = WQS_Session.GetDurationMinutes()
+
+        -- MP: zombie spawning stays client side on purpose. Each participant
+        -- spawns around themselves, so total pressure scales with the size of
+        -- the faction, which is the intended difficulty curve. Storm and sound
+        -- are deduplicated server side in WQS_MPSession instead.
+        -- Gated so dead or already extracted members stop contributing.
+        if WQS_Session.IsSelfParticipating() then
+            WQS_ExtractionEventCheckUpdate()
         end
-        -- WQS_EXTRACTION_ELAPSED_TIME = getTimeInMillis() - WQS_EXTRACTION_START_TIME
-        WQS_EXTRACTION_ELAPSED_TIME = getGameTime():getMinutesStamp() - WQS_EXTRACTION_START_TIME
-        WQS_EXTRACTION_TIME_LEFT = WQS_EXTRACTION_DURATION_TIME_MIN - WQS_EXTRACTION_ELAPSED_TIME
 
-        -- WQS_ExtractionEvent()
-        WQS_ExtractionEventCheckUpdate()
+        if WQS.CurrentStateIs("EXTRACTION_COMPLETED") then
+            return
+        end
 
-        if WQS_EXTRACTION_TIME_LEFT <= 0 then
-            if ST.CanRequestExtraction then
-                WQS.SetState("EXTRACTION_CAN_BE_COMPLETED")
+        if WQS_Session.IsUnlocked() then
+            -- latched by the server: never falls back, so the button cannot
+            -- flicker while the horde pushes people around
+            WQS.SetState("EXTRACTION_CAN_BE_COMPLETED")
+        elseif WQS_EXTRACTION_TIME_LEFT > 0 then
+            WQS.SetState("EXTRACTION_RUNNING")
+        else
+            local me = WQS_Session.GetSelfMember()
+            if me and me.arrived then
+                WQS.SetState("EXTRACTION_WAITING_ARRIVAL")
             else
                 WQS.SetState("EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE")
             end
         end
 
+        -- MP: ConfinedMode no longer wipes this player's run. Leaving the zone
+        -- pauses the shared timer server side and progress is preserved,
+        -- so all we do here is warn.
         if (SandboxVars.WQS_ConfinedMode_opt == true) then
             if not (ST.IsInsideExtractionArea) then
                 player:Say(getText("IGUI_WQS_Out_Of_EZone"));
                 getSoundManager():playUISound("WQSBlip")
-                player:Say(getText("IGUI_WQS_Out_Of_EZone"));
-                WQS.SetState("PRE_EXTRACTION")
             end
         end
     end
@@ -894,41 +921,32 @@ WQS.SetInitialStateFromGameMode = function()
 end
 
 
+--- Kept as a thin alias: the real implementation moved to WQS_Shared so that
+--- a dedicated server, which does not run media/lua/client at all, can register
+--- modded extraction zones too.
 WQS.AddModdedMapExtractionZone = function(ModMapId, ZoneLabel, ModMapFolder, X, Y, Z, PrefSpawnPointList,
                                           PrefSpawnPointsPerc)
-    if not (ModMapId) or not (ZoneLabel) or not (X) or not (Y) then
-        print("### WQS addModdedMapExtractionZone ERROR : some params are nil")
-        return false
-    end
+    return WQS_Shared.AddModdedMapExtractionZone(ModMapId, ZoneLabel, ModMapFolder, X, Y, Z, PrefSpawnPointList,
+        PrefSpawnPointsPerc)
+end
 
-    -- Radius=Radius or 8
-    -- PrefZlevelSpawn=PrefZlevelSpawn or nil
-    local Radius = 8
-    local PrefZlevelSpawn = nil
-    Z = Z or 0
-    PrefSpawnPointsPerc = PrefSpawnPointsPerc or nil
-    PrefSpawnPointList = PrefSpawnPointList or {}
-
-    local MapModIsActive = ActiveMods.getById("currentGame"):isModActive(ModMapId)
-    if (MapModIsActive) then
-        local MyId = ZoneLabel:gsub(" ", "-") .. "-" .. X .. "-" .. Y .. "-" .. Z
-        --local MyId=X.."-"..Y.."-"..Z
-        local ZoneId = "#modded_map#" .. ModMapId .. "_" .. MyId
-        local ExtrData = ExtractionMap.new(ZoneId, X, Y, Z, ZoneLabel, Radius, PrefZlevelSpawn, PrefSpawnPointsPerc,
-            ModMapFolder)
-        table.insert(WQS_ExtractionPointsData, ExtrData)
-        print(" ### WQS AddModdedMapExtractionZone -> Added <" .. ZoneLabel ..
-            "> from mod " .. ModMapId .. " ZoneId=" .. ZoneId)
-        if not (WQS_Shared.TableIsEmptyOrNil(PrefSpawnPointList)) then
-            print(" ### WQS AddModdedMapExtractionZone -> Added PreferredSpawnPointsData key=" ..
-                ZoneId .. " n. values=" .. #PrefSpawnPointList)
-            WQS_PreferredSpawnPointsData[ZoneId] = PrefSpawnPointList
-            -- if not(WQS_PreferredSpawnPointsData[ZoneId]) then
-            --     WQS_PreferredSpawnPointsData[ZoneId]=PrefSpawnPointList
-            -- end
-            --table.insert(WQS_PreferredSpawnPointsData[ZoneId], PrefSpawnPointList)
-        end
+--- Feedback for a request the session refused. The button is only shown when
+--- the local snapshot says it should be, but the snapshot can be up to two
+--- seconds old, so the refusal has to be visible instead of silent.
+WQS_Session.OnReadyRejected = function(args)
+    local pl = WQS.GetCurrentPlayer()
+    if not (pl) then
+        return
     end
+    local reason = args and args.reason or ""
+    if reason == "signal" then
+        pl:Say(getText("IGUI_WQS_AntennaRepeatersNeedMore"))
+    elseif reason == "dead" then
+        pl:Say(getText("IGUI_WQS_MP_ExcludedFromRun"))
+    else
+        pl:Say(getText("IGUI_WQS_MP_RequestRejected"))
+    end
+    getSoundManager():playUISound("WQSBlip")
 end
 
 --- aggiunge il punto di estrazione alla mappa globale del mondo
