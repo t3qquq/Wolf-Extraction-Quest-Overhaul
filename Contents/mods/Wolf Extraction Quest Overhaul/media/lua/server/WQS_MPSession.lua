@@ -940,9 +940,12 @@ local function EvaluateRequestGate(factionKey, sess, onlineMap)
 end
 
 --- Session timer.
---- With ConfinedMode on, the timer only advances while every effective member
---- is inside the zone; a single member stepping out pauses the whole run
---- instead of resetting their progress.
+--- With ConfinedMode on, the timer pauses instead of resetting anyone's
+--- progress. Who has to be inside for it to keep running is picked by
+--- WQS_ConfinedTimerRule_opt:
+---   1 = every effective member (one straggler pauses the whole run)
+---   2 = at least one effective member (the run keeps going while someone holds
+---       the zone, so a death run back does not freeze the clock)
 --- ConfinedMode is deliberately ignored once the completion gate has latched:
 --- the only thing that stops the spawner is reaching stage 4, and stage 4 only
 --- exists past the full duration, so the clock has to keep going no matter who
@@ -966,9 +969,22 @@ local function AdvanceTimer(factionKey, sess, onlineMap)
 
     if sess.State == ST_RUNNING and SandboxVars.WQS_ConfinedMode_opt == true then
         local mapData = GetMapDataByItem(sess.ExtractionMap)
-        for i = 1, #eff do
-            if not IsPlayerInZone(onlineMap[eff[i]], mapData) then
+        if SandboxVars.WQS_ConfinedTimerRule_opt == 2 then
+            local anyInside = false
+            for i = 1, #eff do
+                if IsPlayerInZone(onlineMap[eff[i]], mapData) then
+                    anyInside = true
+                    break
+                end
+            end
+            if not anyInside then
                 return -- paused, progress preserved
+            end
+        else
+            for i = 1, #eff do
+                if not IsPlayerInZone(onlineMap[eff[i]], mapData) then
+                    return -- paused, progress preserved
+                end
             end
         end
     end

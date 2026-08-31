@@ -49,6 +49,13 @@ option WQS_ConfinedMode_opt
 	page = WQS, translation = WQS_ConfinedMode_txt,
 }
 
+option WQS_ConfinedTimerRule_opt
+{
+	type = enum,numValues = 2,default = 1,
+	page = WQS, translation = WQS_ConfinedTimerRule_txt,
+	valueTranslation = WQS_ConfinedTimerRule_optlist,
+}
+
 option WQS_GameModeExtended_opt
 {
 	type = boolean, default = false,

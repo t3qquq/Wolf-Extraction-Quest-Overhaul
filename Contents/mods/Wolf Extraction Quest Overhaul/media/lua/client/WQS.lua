@@ -876,8 +876,15 @@ WQS.MainStatusCheck = function()
         -- MP: ConfinedMode no longer wipes this player's run. Leaving the zone
         -- pauses the shared timer server side and progress is preserved,
         -- so all we do here is warn.
-        if (SandboxVars.WQS_ConfinedMode_opt == true) then
-            if not (ST.IsInsideExtractionArea) then
+        -- Z has no partial-credit zone (the server checks an exact floor
+        -- match), so any mismatch warns immediately. XY gets a 2x radius
+        -- buffer past the server's pause line so the player isn't scolded
+        -- for grazing the edge of the zone the instant the timer stops.
+        -- MapData is only set on the success path, so an empty stats table
+        -- (no session snapshot yet) cannot make this spam.
+        if (SandboxVars.WQS_ConfinedMode_opt == true) and ST.MapData then
+            local outOfRadius = ST.Distance_val and (ST.Distance_val > (ST.MapData.AreaRadiusFromCenter * 2))
+            if outOfRadius or not ST.Zlevel_isok then
                 player:Say(getText("IGUI_WQS_Out_Of_EZone"));
                 getSoundManager():playUISound("WQSBlip")
             end
