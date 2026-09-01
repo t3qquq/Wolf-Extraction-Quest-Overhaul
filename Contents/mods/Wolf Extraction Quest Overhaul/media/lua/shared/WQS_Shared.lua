@@ -362,6 +362,26 @@ WQS_Session.RequestJoin = function()
     WQS_Session.Send("Join", {})
 end
 
+--- Group membership changed, so the cached session key may be stale.
+--- Both throttles have to be cleared, not just one: the no group backoff is a
+--- hard return placed before the interval check, so resetting LastJoinAttempt
+--- alone leaves the blocked to running transition waiting out the full 30s.
+--- This only shortens the wait; the actual key comparison stays on the server,
+--- which is why the reset is unconditional and does not inspect the group.
+---
+--- Vanilla fires both events behind a GameClient.bClient guard
+--- (SafeHouse.java, GameClient.java), so they never reach a dedicated server
+--- or singleplayer. Registering here is still safe because LuaEventManager
+--- declares both names regardless of context.
+local function WQS_OnGroupChanged(what)
+    print("WQS_MP group event: " .. what)
+    WQS_Session.LastJoinAttempt = 0
+    WQS_Session.NoFactionUntil = 0
+end
+
+Events.SyncFaction.Add(function() WQS_OnGroupChanged("SyncFaction") end)
+Events.OnSafehousesChanged.Add(function() WQS_OnGroupChanged("OnSafehousesChanged") end)
+
 --- Overridden by the client files that own the matching UI feedback.
 --- Defined here so the dedicated server, which never loads media/lua/client,
 --- can still route a message without blowing up.
