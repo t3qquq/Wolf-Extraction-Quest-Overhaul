@@ -31,14 +31,6 @@ WQS_RepeaterData = {
     },
 
     {
-        ["area"] = "Raven Creek",
-        ["name"] = "Apartment",
-        ["x"] = 3306,
-        ["y"] = 11205,
-        ["z"] = 6,
-    },
-
-    {
         ["area"] = "Petroville",
         ["name"] = "hospital",
         ["x"] = 11000,
@@ -388,38 +380,6 @@ WQS_RepeaterData = {
         ["x"] = 7275,
         ["y"] = 11288,
         ["z"] = 1,
-    },
-
-    {
-        ["area"] = "Raven Creek",
-        ["name"] = "Research Center",
-        ["x"] = 3014,
-        ["y"] = 11190,
-        ["z"] = 3,
-    },
-
-    {
-        ["area"] = "Raven Creek",
-        ["name"] = "Luxury House",
-        ["x"] = 3570,
-        ["y"] = 11986,
-        ["z"] = 7,
-    },
-
-    {
-        ["area"] = "Raven Creek",
-        ["name"] = "Sky Bridge",
-        ["x"] = 3500,
-        ["y"] = 11280,
-        ["z"] = 4,
-    },
-
-    {
-        ["area"] = "Raven Creek",
-        ["name"] = "Asylum",
-        ["x"] = 4472,
-        ["y"] = 13309,
-        ["z"] = 3,
     },
 
     {

@@ -43,7 +43,6 @@ WQS_RepeaterMapRequirement.byArea = {
     ["Overlook"]                 = "OverlookHotel",
     ["Petroville"]               = "Petroville",
     ["Pitstop"]                  = "Pitstop",
-    ["Raven Creek"]              = "RavenCreek",
     ["Research Facility"]        = "rbr",
     ["Southwood"]                = "Southwood2.0",
     ["St Paulo's Hammer"]        = "SPH",
