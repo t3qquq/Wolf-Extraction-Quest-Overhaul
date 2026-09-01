@@ -578,9 +578,13 @@ local function BuildRepeaterPool()
         if rep and rep.x and rep.y then
             local drop = nil
 
-            -- Gate 1: the map mod this location lives on has to be loaded.
+            -- Gate 1: the map mod's map folder has to be in Map=, not just
+            -- the mod itself enabled in Mods=/WorkshopItems=. A mod can be
+            -- active (its Lua/scripts loaded) while its map was never added
+            -- to Map=, in which case the cells this repeater sits on were
+            -- never merged into the world at all.
             local reqMod = WQS_Shared.GetRepeaterRequiredMod(rep)
-            if reqMod and not WQS_Shared.IsModActive(reqMod) then
+            if reqMod and not WQS_Shared.IsMapLoaded(reqMod) then
                 drop = "mod"
                 missing[reqMod] = (missing[reqMod] or 0) + 1
             end

@@ -732,6 +732,71 @@ WQS_Shared.IsModActive = function(modId)
     return false
 end
 
+---The server's servertest.ini Map= list, split on ";", e.g.
+---{"Muldraugh, KY", "RavenCreek", "LCv2"}. This is the set of map folders
+---actually merged into the world grid -- separate from Mods=/WorkshopItems=,
+---which only decides whether a mod's Lua/scripts are loaded. A mod can be
+---IsModActive() == true while its map folder is absent from Map=, in which
+---case the mod's cells were never added to the world at all.
+---Cached: like WQS_MapBounds, the option cannot change mid-session.
+local WQS_LoadedMapFolders = nil
+
+local function WQS_GetLoadedMapFolders()
+    if WQS_LoadedMapFolders then
+        return WQS_LoadedMapFolders
+    end
+    if not (getServerOptions) then
+        return nil
+    end
+    local so = getServerOptions()
+    local raw = so and so:getOption("Map")
+    if not (raw) or raw == "" then
+        return nil
+    end
+
+    local set = {}
+    local parts = string.split(raw, ";")
+    for i = 1, #parts do
+        set[parts[i]] = true
+    end
+    WQS_LoadedMapFolders = set
+    return set
+end
+
+---True when the map mod behind modId has at least one of its map folders
+---actually present in Map=, i.e. the mod's cells are really in the world --
+---not just whether the mod itself is enabled (see IsModActive above).
+---getMapFoldersForMod is filesystem-based (zombie/gameStates/ChooseGameInfo),
+---so it works the same on a dedicated server as on a client.
+---Falls back to IsModActive when Map= cannot be read (e.g. singleplayer,
+---where there is no servertest.ini), so a repeater is never dropped just
+---because the check itself is inapplicable.
+WQS_Shared.IsMapLoaded = function(modId)
+    if not (modId) then
+        return false
+    end
+
+    local loaded = WQS_GetLoadedMapFolders()
+    if not (loaded) then
+        return WQS_Shared.IsModActive(modId)
+    end
+
+    if not (getMapFoldersForMod) then
+        return WQS_Shared.IsModActive(modId)
+    end
+    local folders = getMapFoldersForMod(modId)
+    if not (folders) then
+        return false
+    end
+
+    for i = 0, folders:size() - 1 do
+        if loaded[folders:get(i)] then
+            return true
+        end
+    end
+    return false
+end
+
 ---Returns the mod id a repeater location needs, or nil when it is vanilla.
 ---See media/lua/shared/WQS_RepeaterMapRequirement.lua for the table itself.
 WQS_Shared.GetRepeaterRequiredMod = function(rep)
