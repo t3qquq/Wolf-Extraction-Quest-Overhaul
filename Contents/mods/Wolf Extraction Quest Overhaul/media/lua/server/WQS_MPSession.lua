@@ -64,6 +64,16 @@ local LastPoll = 0
 local NoFactionLogged = {}
 local NOFACTION_LOG_MS = 60000
 
+--- Last session key each user resolved to. A key change is the only externally
+--- visible effect of creating or leaving a faction or a safehouse, so it is
+--- logged unconditionally: without it a "the session got rebuilt" report has
+--- no timestamp to hang on and the 8-A cases cannot be told apart.
+local LastKeyByUser = {}
+
+--- Boot time configuration dump, fired once from the poll loop rather than at
+--- file load because SandboxVars is not populated yet when this file runs.
+local ConfigLogged = false
+
 -- ##############################################################
 -- hosting mode
 -- ##############################################################
@@ -909,12 +919,17 @@ end
 local function Broadcast(factionKey, sess)
     local onlineMap = GetOnlineMap()
     local snap = BuildSnapshot(factionKey, sess, onlineMap)
+    local sent = 0
     for i = 1, #sess.Roster do
         local p = onlineMap[sess.Roster[i]]
         if p then
             SendTo(p, "Sync", snap)
+            sent = sent + 1
         end
     end
+    WQS_Shared.DLog("broadcast faction=" .. factionKey .. " to=" .. sent ..
+        " roster=" .. #sess.Roster .. " targets=" .. #snap.targets ..
+        " active=" .. tostring(snap.activeCount) .. " state=" .. tostring(snap.state))
 end
 
 WQS_MPSession.Broadcast = Broadcast
@@ -1180,9 +1195,35 @@ local function PollSessions()
     end
 end
 
+--- Modes 2 and 3 lean entirely on vanilla group features, and PlayerSafehouse
+--- is false by default, so picking mode 3 on a stock server locks every player
+--- out with no visible cause. Say so once instead of failing quietly.
+local function LogGroupConfig()
+    local mode = SandboxVars.WQS_GroupMode_opt
+    local so = getServerOptions()
+    local faction, safehouse = nil, nil
+    if so then
+        faction = so:getBoolean("Faction")
+        safehouse = so:getBoolean("PlayerSafehouse")
+    end
+    print("WQS_MP group config mode=" .. tostring(mode) ..
+        " serverFaction=" .. tostring(faction) ..
+        " serverPlayerSafehouse=" .. tostring(safehouse))
+    if mode == GROUP_FACTION_ONLY and faction == false then
+        print("WQS_MP ERROR group mode 2 requires server option Faction=true, nobody can extract")
+    end
+    if mode == GROUP_SAFEHOUSE_ONLY and safehouse == false then
+        print("WQS_MP ERROR group mode 3 requires server option PlayerSafehouse=true, nobody can extract")
+    end
+end
+
 local function OnTickPoll()
     if not IsHost() then
         return
+    end
+    if not ConfigLogged then
+        ConfigLogged = true
+        LogGroupConfig()
     end
     local now = getTimeInMillis()
     if (now - LastPoll) < POLL_DELAY_MS then
@@ -1201,6 +1242,12 @@ local Handlers = {}
 --- Client announces itself. Creates the faction session on first contact.
 Handlers["Join"] = function(sess, factionKey, player, args)
     local u = GetUserKey(player)
+    -- Unconditional: Join is throttled to one call per 3s before the first
+    -- snapshot and one per 30s after it, so this cannot flood on its own. If it
+    -- does flood, that is exactly the bug the line exists to catch.
+    print("WQS_MP join faction=" .. factionKey .. " user=" .. u ..
+        " state=" .. tostring(sess.State) .. " targets=" .. #sess.Targets ..
+        " active=" .. tostring(WQS_MPSession.CountActive(sess)))
     -- a rejoining member is restored unless their character is currently dead
     if player:isDead() then
         MarkDead(factionKey, sess, u, "join-isDead")
@@ -1398,6 +1445,19 @@ local function LogNoFaction(u, command)
     print("WQS_MP command rejected, no faction user=" .. tostring(u) .. " cmd=" .. tostring(command))
 end
 
+--- Never throttled: a key transition means a session was joined, left or
+--- swapped, which happens a handful of times per session at most.
+local function LogKeyChange(u, factionKey)
+    local cur = factionKey or "<none>"
+    local prev = LastKeyByUser[u]
+    if prev == cur then
+        return
+    end
+    LastKeyByUser[u] = cur
+    print("WQS_MP key changed user=" .. tostring(u) ..
+        " from=" .. tostring(prev or "<unset>") .. " to=" .. cur)
+end
+
 local function DispatchCommand(player, command, args)
     if not player then
         return
@@ -1405,8 +1465,17 @@ local function DispatchCommand(player, command, args)
 
     local u = GetUserKey(player)
     local factionKey = WQS_MPSession.GetFactionKey(u)
+    LogKeyChange(u, factionKey)
+
     if not factionKey then
-        SendTo(player, "NoFaction", {})
+        -- The recipe has already consumed the fragments by the time the command
+        -- arrives, and NoFaction alone never reaches OnAddTargetResult, so
+        -- without this reply the craft destroys four fragments silently.
+        if command == "AddRepeaterTarget" then
+            SendTo(player, "AddTargetFailed", { reason = "nogroup" })
+        end
+        -- an empty table deserialises as nil on the client, so never send {}
+        SendTo(player, "NoFaction", { t = 1 })
         LogNoFaction(u, command)
         return
     end

@@ -56,6 +56,7 @@ WQS_Session.OnAddTargetResult = function(ok, args)
     end
 
     if ok then
+        WQS_Shared.DLog("target request accepted")
         player:Say(getText("IGUI_WQS_TargetAntennaRepeaterLocationAdded"))
         return
     end
@@ -66,6 +67,8 @@ WQS_Session.OnAddTargetResult = function(ok, args)
 
     if reason == "full" then
         player:Say(getText("IGUI_WQS_HaveAllTargetAntennaRepeaterLocations"))
+    elseif reason == "nogroup" then
+        player:Say(getText("IGUI_WQS_MP_NoFaction"))
     else
         player:Say(getText("IGUI_WQS_MP_TargetRequestFailed"))
     end

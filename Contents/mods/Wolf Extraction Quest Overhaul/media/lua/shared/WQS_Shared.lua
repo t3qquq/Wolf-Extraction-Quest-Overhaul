@@ -2,6 +2,17 @@
 WQS_Shared = {}
 WQS_SharedGuiUtil = {}
 
+--- Verbose diagnostics, off by default (sandbox option WQS_DebugLog_opt).
+--- A single completed run already emits around a thousand tagged lines, so
+--- anything that fires per tick or per snapshot stays behind this flag: a real
+--- error is worthless once it is buried. Turn it on for testing only.
+--- Read at call time, never cached; sandbox values always exist after load.
+function WQS_Shared.DLog(msg)
+    if SandboxVars.WQS_DebugLog_opt then
+        print("WQS_DBG " .. msg)
+    end
+end
+
 -- WQS_Shared.BGColor = {r=0.37, g=0.47, b=0.54, a=1.0}
 -- WQS_Shared.BGColorMouseOver = {r=0.25, g=0.42, b=0.63, a=1.0}; --blu ok
 -- WQS_Shared.BorderColor = {r=0.5, g=0.5, b=1, a=0.7};
@@ -328,6 +339,8 @@ WQS_Session.RequestJoin = function()
     local now = getTimeInMillis()
 
     if (not WQS_Session.HasFaction) and (now < WQS_Session.NoFactionUntil) then
+        WQS_Shared.DLog("join skipped, no group backoff " ..
+            tostring(WQS_Session.NoFactionUntil - now) .. "ms left")
         return
     end
 
@@ -336,9 +349,16 @@ WQS_Session.RequestJoin = function()
         wait = 30000
     end
     if (now - WQS_Session.LastJoinAttempt) < wait then
+        WQS_Shared.DLog("join throttled, " ..
+            tostring(wait - (now - WQS_Session.LastJoinAttempt)) .. "ms left")
         return
     end
     WQS_Session.LastJoinAttempt = now
+    -- Unconditional: capped at one per 30s once a snapshot is held, one per 3s
+    -- before that. Measuring the delay between a group edit and the resulting
+    -- session swap is impossible without a timestamp on this side.
+    print("WQS_MP join requested, snapshot=" .. tostring(WQS_Session.Data ~= nil) ..
+        " hasGroup=" .. tostring(WQS_Session.HasFaction))
     WQS_Session.Send("Join", {})
 end
 
@@ -350,13 +370,27 @@ WQS_Session.OnReadyRejected = function(args) end
 
 WQS_Session.OnServerMessage = function(command, args)
     if command == "Sync" then
+        local hadSnapshot = WQS_Session.Data ~= nil
         WQS_Session.HasFaction = true
         WQS_Session.Data = args
+        if not hadSnapshot then
+            -- first snapshot after a join or a group swap: the only client side
+            -- proof that targets and activations survived
+            print("WQS_MP first sync, faction=" .. tostring(args and args.faction) ..
+                " state=" .. tostring(args and args.state) ..
+                " targets=" .. tostring(args and args.targets and #args.targets or 0) ..
+                " active=" .. tostring(args and args.activeCount))
+        else
+            WQS_Shared.DLog("sync faction=" .. tostring(args and args.faction) ..
+                " state=" .. tostring(args and args.state) ..
+                " targets=" .. tostring(args and args.targets and #args.targets or 0) ..
+                " active=" .. tostring(args and args.activeCount))
+        end
     elseif command == "NoFaction" then
         WQS_Session.HasFaction = false
         WQS_Session.Data = nil
         WQS_Session.NoFactionUntil = getTimeInMillis() + 30000
-        print("WQS_MP client: not in a faction, extraction is locked")
+        print("WQS_MP client: no faction or safehouse, extraction is locked")
     elseif command == "AddTargetOk" then
         WQS_Session.OnAddTargetResult(true, args or {})
     elseif command == "AddTargetFailed" then

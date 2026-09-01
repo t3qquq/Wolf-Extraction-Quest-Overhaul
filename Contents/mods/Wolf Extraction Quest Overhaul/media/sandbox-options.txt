@@ -70,6 +70,12 @@ option WQS_GroupMode_opt
 	valueTranslation = WQS_GroupMode_optlist,
 }
 
+option WQS_DebugLog_opt
+{
+	type = boolean, default = false,
+	page = WQS, translation = WQS_DebugLog_txt,
+}
+
 option WQS_ZoneMap_opt
 {
 	type = enum,numValues = 10,default = 1,
