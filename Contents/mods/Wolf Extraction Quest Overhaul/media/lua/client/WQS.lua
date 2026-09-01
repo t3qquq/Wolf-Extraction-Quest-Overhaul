@@ -395,8 +395,12 @@ WQS.ComposeExtractionStatsTxt = function(playerObj)
 
     stats_raw = WQS.getActualExtractionStats(playerObj)
 
+    -- getActualExtractionStats returns {} whenever there is no session
+    -- snapshot, which is a normal state, not a failure. In group modes 2 and 3
+    -- a groupless player sits here indefinitely, so an unconditional print
+    -- buried the log under thousands of lines per session.
     if (WQS_Shared.TableIsEmptyOrNil(stats_raw)) then
-        print(" WQS ERROR getActualExtractionStats")
+        WQS_Shared.DLog("no extraction stats, session snapshot missing")
         return {}
     end
 

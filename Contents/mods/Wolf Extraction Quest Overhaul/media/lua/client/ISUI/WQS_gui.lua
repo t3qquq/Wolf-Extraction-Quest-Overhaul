@@ -164,8 +164,32 @@ local function WQS_GPSWindowUpdate()
 		local ComposedStat = {}
 		ComposedStat = WQS.ComposeExtractionStatsTxt(player)
 
+		-- No session snapshot: the player has not joined yet, or the group was
+		-- just dissolved and the server replied NoFaction. Returning early left
+		-- the previous run's targets and signal strength frozen on screen until
+		-- a brand new session arrived, so paint the locked state instead.
+		-- The print is a debug line, not an error: in group modes 2 and 3 this
+		-- path runs on every update for as long as a player has no group.
 		if WQS_Shared.TableIsEmptyOrNil(ComposedStat) then
-			print(" WQS ERROR ComposedStat")
+			WQS_Shared.DLog("tracker has no session snapshot, painting locked state")
+			WQS_GPSWindow.ReqExtrBut:setVisible(false)
+			WQS_GPSWindow.CompleteExtrBut:setVisible(false)
+			WQS_GPSWindow.ManageAntennaBut:setVisible(false)
+
+			local lockedTxt = ""
+			if not WQS_Session.HasFaction then
+				lockedTxt = " <H1> <LEFT> " .. WQS_COLTIT ..
+					(getText("IGUI_WQS_MainLabel") or "Extraction") ..
+					" <RGB:1,1,1> <LINE> <SIZE:small> <LEFT> " ..
+					getText("IGUI_WQS_MP_NoFaction")
+			end
+
+			WQS_GPSWindow.nvnGPSBody.text = lockedTxt
+			WQS_GPSWindow.nvnGPSBody:paginate()
+
+			local lockedH = WQS_GPSWindow.nvnGPSBody.height
+			WQS_GPSWindow:setHeight(lockedH + WQS_GPSWindow.dim.btnHgt +
+				WQS_GPSWindow.dim.MainPadding * 4)
 			return nil
 		end
 

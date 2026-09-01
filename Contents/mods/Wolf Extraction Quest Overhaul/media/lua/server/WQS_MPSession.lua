@@ -70,9 +70,10 @@ local NOFACTION_LOG_MS = 60000
 --- no timestamp to hang on and the 8-A cases cannot be told apart.
 local LastKeyByUser = {}
 
---- Boot time configuration dump, fired once from the poll loop rather than at
---- file load because SandboxVars is not populated yet when this file runs.
-local ConfigLogged = false
+--- Last group mode written to the console. Also acts as the "not logged yet"
+--- flag, so the configuration dump is emitted from the poll loop rather than at
+--- file load, where SandboxVars is not populated yet.
+local LoggedGroupMode = nil
 
 -- ##############################################################
 -- hosting mode
@@ -1221,15 +1222,26 @@ local function OnTickPoll()
     if not IsHost() then
         return
     end
-    if not ConfigLogged then
-        ConfigLogged = true
-        LogGroupConfig()
-    end
     local now = getTimeInMillis()
     if (now - LastPoll) < POLL_DELAY_MS then
         return
     end
     LastPoll = now
+    -- An admin can change the group mode at runtime through the server sandbox
+    -- options UI, and SandboxOptions.toLua() fires no Lua event. The old one
+    -- shot log then described a mode that was no longer in effect, and the
+    -- Faction / PlayerSafehouse mismatch warning was never re-evaluated.
+    -- Comparing on the poll tick catches every path without a UI hook.
+    local mode = SandboxVars.WQS_GroupMode_opt
+    if LoggedGroupMode ~= mode then
+        if LoggedGroupMode ~= nil then
+            print("WQS_MP group mode changed at runtime from=" .. tostring(LoggedGroupMode) ..
+                " to=" .. tostring(mode) ..
+                ", sessions keyed for the previous mode are now unreachable")
+        end
+        LoggedGroupMode = mode
+        LogGroupConfig()
+    end
     PollSessions()
 end
 

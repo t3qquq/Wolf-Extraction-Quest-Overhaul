@@ -20,8 +20,11 @@ function WQS_ExtractionItem_context(player, context, items)
 	if ((testItem) and (testItem:getType() == WQS_Shared.getExtractionItemId())) then
 		local ComposedStat = WQS.ComposeExtractionStatsTxt(playerObj)
 
+		-- Same normal path as the tracker: no snapshot means no menu entries.
+		-- Debug level, not an error, or it fires on every right click while a
+		-- player is groupless.
 		if WQS_Shared.TableIsEmptyOrNil(ComposedStat) then
-			print(" WQS ERROR ComposedStat")
+			WQS_Shared.DLog("context menu has no session snapshot")
 			return nil
 		end
 
