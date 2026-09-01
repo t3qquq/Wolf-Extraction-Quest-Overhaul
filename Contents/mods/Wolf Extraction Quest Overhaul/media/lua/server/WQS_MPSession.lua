@@ -41,9 +41,14 @@ local ST_DONE = "DONE"         -- everyone extracted
 local SP_KEY = "@sp"
 
 --- Group modes, see sandbox option WQS_GroupMode_opt.
-local GROUP_FACTION_OR_SOLO = 1 -- faction when there is one, solo otherwise
-local GROUP_FACTION_ONLY = 2    -- faction required, no faction means no quest
-local GROUP_SAFEHOUSE = 3       -- safehouse when there is one, solo otherwise
+--- No solo fallback: modes 2 and 3 block a player who has no group instead of
+--- quietly giving them a private session. A one man faction or a one man
+--- safehouse is always possible, so "I want to play alone" is mode 1.
+--- Because a key kind can never change inside one mode, a session is never
+--- migrated and the promotion problem does not exist.
+local GROUP_SOLO = 1           -- always personal, as in the original mod
+local GROUP_FACTION_ONLY = 2   -- faction required, no faction means no quest
+local GROUP_SAFEHOUSE_ONLY = 3 -- safehouse required, none means no quest
 
 --- Session keys carry the kind that produced them. Without the prefix a
 --- faction called "Bob" and a player called "Bob" would share one session.
@@ -136,7 +141,7 @@ local function GetPlayerSafehouse(username)
         return nil
     end
     if not SafeHouse then
-        print("WQS_MP WARN SafeHouse class unavailable, group mode falls back to solo")
+        print("WQS_MP WARN SafeHouse class unavailable, safehouse mode blocks everyone")
         return nil
     end
     return SafeHouse.hasSafehouse(username)
@@ -162,23 +167,24 @@ function WQS_MPSession.GetFactionKey(username)
 
     local mode = GetGroupMode()
 
-    if mode == GROUP_SAFEHOUSE then
+    if mode == GROUP_FACTION_ONLY then
+        local f = Faction.getPlayerFaction(username)
+        if f then
+            return KEY_FACTION .. f:getName()
+        end
+        return nil
+    end
+
+    if mode == GROUP_SAFEHOUSE_ONLY then
         local sh = GetPlayerSafehouse(username)
         if sh then
             return SafehouseKey(sh)
         end
-        -- no safehouse: the player runs the quest on their own
-        return KEY_PLAYER .. username
-    end
-
-    local f = Faction.getPlayerFaction(username)
-    if f then
-        return KEY_FACTION .. f:getName()
-    end
-
-    if mode == GROUP_FACTION_ONLY then
         return nil
     end
+
+    -- GROUP_SOLO: every player runs their own quest, faction and safehouse
+    -- membership are ignored on purpose
     return KEY_PLAYER .. username
 end
 
