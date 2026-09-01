@@ -85,7 +85,7 @@ IGUI_KO = {
 
     IGUI_WQS_MP_WaitingRequest = "탈출 요청 대기 중",
     IGUI_WQS_MP_WaitingArrival = "탈출 대기 중",
-    IGUI_WQS_MP_NoFaction = "탈출을 요청하려면 파벌 또는 은신처에 소속되어야 합니다.",
+    IGUI_WQS_MP_NoFaction = "탈출을 요청하려면 조직 또는 은신처에 소속되어야 합니다.",
     IGUI_WQS_MP_RunFinished = "팩션 전원 탈출 완료",
     IGUI_WQS_MP_RequestRejected = "지금은 탈출을 요청할 수 없다",
     IGUI_WQS_MP_ExcludedFromRun = "이번 탈출 작전에서는 제외됐다",

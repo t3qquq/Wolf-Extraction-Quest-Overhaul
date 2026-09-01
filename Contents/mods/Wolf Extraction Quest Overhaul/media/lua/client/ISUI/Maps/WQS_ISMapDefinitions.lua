@@ -27,14 +27,13 @@ end
 
 
 
-function CommonMapCalc(mapUI, MapItemName, startX, startY, citylegend, MapFolder)
+function CommonMapCalc(mapUI, MapItemName, startX, startY, citylegend, ModMapFolder)
 	--MapItemName è il nome dell'item (in WQS_items.txt) che spawna e mostra questa mappa
 	--local MapItemName="WQS_item_list.wqs_map_louisville1"
 
-
-	if not (MapFolder) or (MapFolder == "") then
-		MapFolder = "media/maps/Muldraugh, KY"
-	end
+	-- vanilla tiles are always loaded as the base layer; ModMapFolder, when the
+	-- zone belongs to a map mod, is layered on top of it.
+	local MapFolder = "media/maps/Muldraugh, KY"
 
 	--print("WQS MapFolder="..MapFolder)
 
@@ -49,6 +48,13 @@ function CommonMapCalc(mapUI, MapItemName, startX, startY, citylegend, MapFolder
 
 	--local mapAPI = mapUI.javaObject:getAPIv1()
 
+	-- initDirectoryMapData reads one folder only, so a zone that sits on a
+	-- modded map used to render on an empty background: the vanilla tiles have
+	-- nothing there. Load the mod folder first and vanilla second, which is the
+	-- priority order initDefaultMapData uses (mods override vanilla per cell).
+	if ModMapFolder and (ModMapFolder ~= "") then
+		MapUtils.initDirectoryMapData(mapUI, ModMapFolder)
+	end
 	MapUtils.initDirectoryMapData(mapUI, MapFolder)
 	MapUtils.initDefaultStyleV1(mapUI)
 	--replaceWaterStyle(mapUI) --non funziona
@@ -184,11 +190,11 @@ end
 LootMaps.Init.WQS_LouisvilleMap1 = function(mapUI)
 	--MapItemName è il nome dell'item (in WQS_items.txt) che spawna e mostra questa mappa
 	local MName = "WQS_item_list.wqs_map_louisville1"
-	CommonMapCalc(mapUI, MName, WQS_LvGridX1(0), WQS_LvGridY1(0))
+	CommonMapCalc(mapUI, MName, 10857, 8142, -1, "media/maps/Xonics Mega Mall")
 
 	local mapAPI = mapUI.javaObject:getAPIv1()
 	-- Show only this area from the full map.
-	mapAPI:setBoundsInSquares(WQS_LvGridX1(0), WQS_LvGridY1(0), WQS_LvGridX2(0), WQS_LvGridY2(0))
+	mapAPI:setBoundsInSquares(10857, 8142, 11757, 8842)
 end
 
 --Ohio Mall Roof
@@ -217,10 +223,10 @@ end
 LootMaps.Init.WQS_LouisvilleMap4 = function(mapUI)
 	--MapItemName è il nome dell'item (in WQS_items.txt) che spawna e mostra questa mappa
 	local MName = "WQS_item_list.wqs_map_louisville4"
-	CommonMapCalc(mapUI, MName, WQS_LvGridX1(0), WQS_LvGridY1(0))
+	CommonMapCalc(mapUI, MName, 12647, 4281, -1, "media/maps/lvinternationalairport")
 	local mapAPI = mapUI.javaObject:getAPIv1()
 	-- Show only this area from the full map.
-	mapAPI:setBoundsInSquares(WQS_LvGridX1(0), WQS_LvGridY1(0), WQS_LvGridX2(0), WQS_LvGridY2(0))
+	mapAPI:setBoundsInSquares(12647, 4281, 13547, 4981)
 end
 
 --Louisville Orio Offices Roof
@@ -237,10 +243,10 @@ end
 LootMaps.Init.WQS_MuldraughMap1 = function(mapUI)
 	--MapItemName è il nome dell'item (in WQS_items.txt) che spawna e mostra questa mappa
 	local MName = "WQS_item_list.wqs_map_muldraugh1"
-	CommonMapCalc(mapUI, MName, 10540, 9240, 1)
+	CommonMapCalc(mapUI, MName, 15485, 7561, -1, "media/maps/LCV2")
 	local mapAPI = mapUI.javaObject:getAPIv1()
 	-- Show only this area from the full map.
-	mapAPI:setBoundsInSquares(10540, 9240, 11217, 10696)
+	mapAPI:setBoundsInSquares(15485, 7561, 16385, 8261)
 	--mapAPI:setBoundsInSquares(WQS_LvGridX1(0), WQS_LvGridY1(0), WQS_LvGridX2(0), WQS_LvGridY2(0))	
 end
 
@@ -248,10 +254,10 @@ end
 LootMaps.Init.WQS_MuldraughMap2 = function(mapUI)
 	--MapItemName è il nome dell'item (in WQS_items.txt) che spawna e mostra questa mappa
 	local MName = "WQS_item_list.wqs_map_muldraugh2"
-	CommonMapCalc(mapUI, MName, 10540, 9240, 1)
+	CommonMapCalc(mapUI, MName, 10761, 6046, -1, "media/maps/Otr")
 	local mapAPI = mapUI.javaObject:getAPIv1()
 	-- Show only this area from the full map.
-	mapAPI:setBoundsInSquares(10540, 9240, 11217, 10696)
+	mapAPI:setBoundsInSquares(10761, 6046, 11661, 6746)
 	--mapAPI:setBoundsInSquares(WQS_LvGridX1(0), WQS_LvGridY1(0), WQS_LvGridX2(0), WQS_LvGridY2(0))	
 end
 
@@ -259,10 +265,10 @@ end
 LootMaps.Init.WQS_MarchRidgeMap1 = function(mapUI)
 	--MapItemName è il nome dell'item (in WQS_items.txt) che spawna e mostra questa mappa
 	local MName = "WQS_item_list.wqs_map_march_ridge1"
-	CommonMapCalc(mapUI, MName, 9700, 12470, 2)
+	CommonMapCalc(mapUI, MName, 5281, 12158, -1, "media/maps/researchbase")
 	local mapAPI = mapUI.javaObject:getAPIv1()
 	-- Show only this area from the full map.
-	mapAPI:setBoundsInSquares(9700, 12470, 10579, 13199)
+	mapAPI:setBoundsInSquares(5281, 12158, 6181, 12858)
 	--mapAPI:setBoundsInSquares(WQS_LvGridX1(0), WQS_LvGridY1(0), WQS_LvGridX2(0), WQS_LvGridY2(0))	
 end
 

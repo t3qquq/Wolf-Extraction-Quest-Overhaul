@@ -26,7 +26,7 @@ end
 WQS_ExtractionPointsData[1] = ExtractionMap.new("random")
 
 --Louisville Bridge Road - Changed to Mega Mall
-WQS_ExtractionPointsData[2] = ExtractionMap.new("WQS_item_list.wqs_map_louisville1",11307,8492,3,"Mega Mall")   
+WQS_ExtractionPointsData[2] = ExtractionMap.new("WQS_item_list.wqs_map_louisville1",11307,8492,3,"Mega Mall",8,nil,nil,"media/maps/Xonics Mega Mall")   
 WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_louisville1"]= {
     {x=11340,y=8486,z=3},
     {x=11325,y=8465,z=3},
@@ -55,7 +55,7 @@ WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_louisville3"]= {
     {x=12933,y=2028,z=2}
     }
 --Louisville Fossoil factory Roof - Changed to LV International Airport Gate A4
-WQS_ExtractionPointsData[5] = ExtractionMap.new("WQS_item_list.wqs_map_louisville4",13097,4631,1,"LV International Airport Gate A4") 
+WQS_ExtractionPointsData[5] = ExtractionMap.new("WQS_item_list.wqs_map_louisville4",13097,4631,1,"LV International Airport Gate A4",8,nil,nil,"media/maps/lvinternationalairport") 
 WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_louisville4"]= {
     {x=13111,y=4620,z=0},
     {x=13080,y=4620,z=1},
@@ -74,7 +74,7 @@ WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_louisville5"]= {
     }
 
 --Muldraugh Mass-Genfac Roof - Changed to Lake Cumberland Mall
-WQS_ExtractionPointsData[7] = ExtractionMap.new("WQS_item_list.wqs_map_muldraugh1",15935, 7911,5,"Lake Cumberland Mall")
+WQS_ExtractionPointsData[7] = ExtractionMap.new("WQS_item_list.wqs_map_muldraugh1",15935, 7911,5,"Lake Cumberland Mall",8,nil,nil,"media/maps/LCV2")
 WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_muldraugh1"]= {
     {x=15926,y=7906,z=3},
     {x=15923,y=7921,z=5},
@@ -87,7 +87,7 @@ WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_muldraugh1"]= {
     }
 
 --Muldraugh Soccer Field - Changed to Over the River Bridge
-WQS_ExtractionPointsData[8] = ExtractionMap.new("WQS_item_list.wqs_map_muldraugh2",11211, 6396,4,"Over the River Bridge")
+WQS_ExtractionPointsData[8] = ExtractionMap.new("WQS_item_list.wqs_map_muldraugh2",11211, 6396,4,"Over the River Bridge",8,nil,nil,"media/maps/Otr")
 WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_muldraugh2"]= {
     {x=11205,y=6398,z=3},
     {x=11220,y=6394,z=3},
@@ -99,7 +99,7 @@ WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_muldraugh2"]= {
 
 
 --March Ridge Cinema - Changed to Research Facility Helipad
-WQS_ExtractionPointsData[9] = ExtractionMap.new("WQS_item_list.wqs_map_march_ridge1",5731, 12508,0,"Research Facility Helipad",8,0)
+WQS_ExtractionPointsData[9] = ExtractionMap.new("WQS_item_list.wqs_map_march_ridge1",5731, 12508,0,"Research Facility Helipad",8,0,nil,"media/maps/researchbase")
 WQS_PreferredSpawnPointsData["WQS_item_list.wqs_map_march_ridge1"]= {
     {x=5711,y=12489,z=0},
     {x=5710,y=12505,z=0},
@@ -148,12 +148,13 @@ function WQS_LvGridY2(row)
 	return WQS_LvGridY1(row) + LVh - 1 + LVbadgeHgt
 end
 
+--Mega Mall (Xonics Mega Mall) Map Gui
 WQS_MapUIData["WQS_item_list.wqs_map_louisville1"] = {
-    Sx = WQS_LvGridX1(0),         --map GUI start x
-    Sy = WQS_LvGridY1(0),         --map GUI start y
-    Ex = WQS_LvGridX2(0),         --map GUI end x
-    Ey = WQS_LvGridY2(0),         --map GUI end y
-    CityLegend = 0
+    Sx = 10857,     --map GUI start x
+    Sy = 8142,      --map GUI start y
+    Ex = 11757,     --map GUI end x
+    Ey = 8842,      --map GUI end y
+    CityLegend = -1
 }
 --Ohio Mall Roof	
 WQS_MapUIData["WQS_item_list.wqs_map_louisville2"] = {
@@ -171,13 +172,13 @@ WQS_MapUIData["WQS_item_list.wqs_map_louisville3"] = {
     Ey = WQS_LvGridY2(1),         --map GUI end y
     CityLegend = 0
 }
---Louisville Fossoil factory Roof
+--LV International Airport Gate A4 Map Gui
 WQS_MapUIData["WQS_item_list.wqs_map_louisville4"] = {
-    Sx = WQS_LvGridX1(0),         --map GUI start x
-    Sy = WQS_LvGridY1(0),         --map GUI start y
-    Ex = WQS_LvGridX2(0),         --map GUI end x
-    Ey = WQS_LvGridY2(0),         --map GUI end y
-    CityLegend = 0
+    Sx = 12647,     --map GUI start x
+    Sy = 4281,      --map GUI start y
+    Ex = 13547,     --map GUI end x
+    Ey = 4981,      --map GUI end y
+    CityLegend = -1
 }
 --Louisville Orio Offices Roof	
 WQS_MapUIData["WQS_item_list.wqs_map_louisville5"] = {
@@ -187,29 +188,29 @@ WQS_MapUIData["WQS_item_list.wqs_map_louisville5"] = {
     Ey = WQS_LvGridY2(0),         --map GUI end y
     CityLegend = 0
 }
---Muldraugh Mass-Genfac Roof Map Gui
+--Lake Cumberland Mall (LCv2) Map Gui
 WQS_MapUIData["WQS_item_list.wqs_map_muldraugh1"] = {
-    Sx = 10540,         --map GUI start x
-    Sy = 9240,          --map GUI start y
-    Ex = 11217,         --map GUI end x
-    Ey = 10696,         --map GUI end y
-    CityLegend = 1
+    Sx = 15485,     --map GUI start x
+    Sy = 7561,      --map GUI start y
+    Ex = 16385,     --map GUI end x
+    Ey = 8261,      --map GUI end y
+    CityLegend = -1
 }
---Muldraugh Soccer Field Map Gui		
+--Over the River Bridge (Otr) Map Gui
 WQS_MapUIData["WQS_item_list.wqs_map_muldraugh2"] = {
-    Sx = 10540,         --map GUI start x
-    Sy = 9240,          --map GUI start y
-    Ex = 11217,         --map GUI end x
-    Ey = 10696,         --map GUI end y
-    CityLegend = 1
+    Sx = 10761,     --map GUI start x
+    Sy = 6046,      --map GUI start y
+    Ex = 11661,     --map GUI end x
+    Ey = 6746,      --map GUI end y
+    CityLegend = -1
 }
---March Ridge Cinema Map Gui	
+--Research Facility Helipad (rbr) Map Gui
 WQS_MapUIData["WQS_item_list.wqs_map_march_ridge1"] = {
-    Sx = 9700,          --map GUI start x
-    Sy = 12470,         --map GUI start y
-    Ex = 10579,         --map GUI end x
-    Ey = 13199,         --map GUI end y
-    CityLegend = 2
+    Sx = 5281,      --map GUI start x
+    Sy = 12158,     --map GUI start y
+    Ex = 6181,      --map GUI end x
+    Ey = 12858,     --map GUI end y
+    CityLegend = -1
 }
 --Rosewood Penitentiary prison Map Gui
 WQS_MapUIData["WQS_item_list.wqs_map_rosewood1"] = {
