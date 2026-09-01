@@ -1406,6 +1406,56 @@ Handlers["ActivateRepeater"] = function(sess, factionKey, player, args)
     return false
 end
 
+--- Antenna pickup. The original mod dropped a repeater from the active list
+--- as soon as the antenna item was no longer on its square, so one antenna
+--- could never light up two places at once. That check used to live on the
+--- client, where it could not stay: the list is faction wide now, and an
+--- unloaded chunk is indistinguishable from a removed antenna, so a client
+--- walking away would wipe the team's progress.
+--- The report is therefore only a hint. Everything is re-proved here:
+--- the reporter has to stand next to the repeater, the server has to be able
+--- to see that square itself, and the antenna has to be genuinely absent from
+--- the server's own view. A client that lies, that is out of range, or that
+--- disagrees with the server about the tile (see the antenna coordinate
+--- mismatch, WQS_antenna.lua) changes nothing.
+Handlers["DeactivateRepeater"] = function(sess, factionKey, player, args)
+    local u = GetUserKey(player)
+    if not args.area or not args.name then
+        return false
+    end
+    local key = tostring(args.area) .. "|" .. tostring(args.name)
+
+    local act = sess.ActiveRepeaters[key]
+    if not act then
+        return false
+    end
+
+    local pdx = player:getX() - act.x
+    local pdy = player:getY() - act.y
+    if math.sqrt((pdx * pdx) + (pdy * pdy)) > (ACTIVATION_DISTANCE + 2) then
+        print("WQS_MP DeactivateRepeater rejected, reporter is not next to the repeater key=" ..
+            key .. " user=" .. u)
+        return false
+    end
+
+    -- an unloaded square on the server side proves nothing either way
+    if not getCell():getGridSquare(act.x, act.y, act.z) then
+        print("WQS_MP DeactivateRepeater rejected, square not loaded server side key=" ..
+            key .. " user=" .. u)
+        return false
+    end
+    if AntennaOnSquare(act.x, act.y, act.z) then
+        print("WQS_MP DeactivateRepeater rejected, antenna still on the square key=" ..
+            key .. " user=" .. u)
+        return false
+    end
+
+    sess.ActiveRepeaters[key] = nil
+    print("WQS_MP repeater deactivated faction=" .. factionKey ..
+        " key=" .. key .. " by=" .. u)
+    return true
+end
+
 --- Headquarters menu: request a different extraction zone for the faction.
 --- The zone is session state, so the old client side WQS.setCurretExtractionMap
 --- wrote it into the caller's own ModData where nobody, not even the caller,

@@ -95,21 +95,42 @@ function IsItemOnGroundNear(squareToCheck, ItemTypeToFind)
     return result
 end
 
---- MP: this used to delete active repeaters from the local list whenever the
---- antenna item was not found on its square. That cannot stay client side:
---- the list is now faction wide, so any single client could wipe the whole
---- team's progress, and an unloaded chunk looks identical to a stolen antenna.
---- Kept as a read only probe until a server side DeactivateRepeater path exists.
+--- MP: the original deleted active repeaters from the local list whenever the
+--- antenna item was not found on its square. That cannot stay client side: the
+--- list is faction wide, so any single client could wipe the whole team's
+--- progress, and an unloaded chunk looks identical to a stolen antenna.
+--- Instead the missing antenna is only reported; the server re-proves it and
+--- owns the decision (see Handlers["DeactivateRepeater"]).
+--- Throttled per repeater because this runs every 4s and the server may
+--- legitimately reject the report for a while (unloaded square on its side).
+local DeactivateReported = {}
+local DEACTIVATE_REPORT_MS = 10000
+
 WQSAntenna.CheckStatusOfRepeaters = function()
     local RepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
     if not RepeaterList then
         return {}
     end
+    local now = getTimeInMillis()
     for k, SingleRepeater in pairs(RepeaterList) do
         local square = getCell():getGridSquare(SingleRepeater.x, SingleRepeater.y, SingleRepeater.z)
         if square then
             if not IsItemOnSquare(square, WQS_Shared.getAntennaItemId()) then
-                print("WQS_MP WARN repeater " .. tostring(k) .. " antenna missing on a loaded square")
+                local target = SingleRepeater.activeForTargetRep
+                if target and target.area and target.name then
+                    local last = DeactivateReported[k]
+                    if not last or (now - last) > DEACTIVATE_REPORT_MS then
+                        DeactivateReported[k] = now
+                        print("WQS_MP repeater " .. tostring(k) ..
+                            " antenna missing on a loaded square, reporting deactivation")
+                        WQS_Session.Send("DeactivateRepeater", {
+                            area = target.area,
+                            name = target.name,
+                        })
+                    end
+                end
+            else
+                DeactivateReported[k] = nil
             end
         end
     end
