@@ -27,6 +27,13 @@ local MODULE = "WQS_MP"
 local POLL_DELAY_MS = 2000
 local GMD_KEY = "WQS_MP"
 
+--- Join fires every 3s before the first snapshot and every 30s after it, so
+--- this one line dominates the server log on a long run. Kept out of
+--- WQS_DebugLog_opt on purpose: that option gates the WQS_DBG diagnostics the
+--- test plan needs switched on, and those must stay usable while this is off.
+--- Flip to true when counting Join rate (join flood check).
+local LOG_JOIN = false
+
 -- session states
 local ST_PRE = "PRE"           -- quest running, extraction not requested
 local ST_PENDING = "PENDING"   -- request gate open, waiting for all ready
@@ -1258,12 +1265,14 @@ local Handlers = {}
 --- Client announces itself. Creates the faction session on first contact.
 Handlers["Join"] = function(sess, factionKey, player, args)
     local u = GetUserKey(player)
-    -- Unconditional: Join is throttled to one call per 3s before the first
-    -- snapshot and one per 30s after it, so this cannot flood on its own. If it
-    -- does flood, that is exactly the bug the line exists to catch.
-    print("WQS_MP join faction=" .. factionKey .. " user=" .. u ..
-        " state=" .. tostring(sess.State) .. " targets=" .. #sess.Targets ..
-        " active=" .. tostring(WQS_MPSession.CountActive(sess)))
+    -- Gated by LOG_JOIN: throttling keeps this from flooding, but at one line
+    -- per 3-30s it still buries the rest of the log on a long run. Turn it on
+    -- when the Join rate itself is what is being measured.
+    if LOG_JOIN then
+        print("WQS_MP join faction=" .. factionKey .. " user=" .. u ..
+            " state=" .. tostring(sess.State) .. " targets=" .. #sess.Targets ..
+            " active=" .. tostring(WQS_MPSession.CountActive(sess)))
+    end
     -- a rejoining member is restored unless their character is currently dead
     if player:isDead() then
         MarkDead(factionKey, sess, u, "join-isDead")
