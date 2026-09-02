@@ -72,8 +72,11 @@ function WQS_GPSWindow:createChildren()
 	self.ReqExtrBut = ISButton:new(MainPadding, BtnY, btnWid, btnHgt, getText("IGUI_WQS_ReqExtraction"), self,
 		WQS.BeginExtraction)
 	self.ReqExtrBut.internal = "REQUEST_EXTRACTION_BUTTON";
+	-- Both anchors are off on purpose: WQS_ApplyWindowHeight places the buttons
+	-- explicitly. See the comment on that function for why anchorBottom cannot
+	-- be trusted here.
 	self.ReqExtrBut.anchorTop = false
-	self.ReqExtrBut.anchorBottom = true
+	self.ReqExtrBut.anchorBottom = false
 	self.ReqExtrBut:initialise();
 	self.ReqExtrBut:instantiate();
 	--self.ReqExtrBut.borderColor = {r=1, g=0.6, b=0, a=1.0};
@@ -89,7 +92,7 @@ function WQS_GPSWindow:createChildren()
 		WQS.CompleteExtraction)
 	self.CompleteExtrBut.internal = "COMPLETE_EXTRACTION_BUTTON";
 	self.CompleteExtrBut.anchorTop = false
-	self.CompleteExtrBut.anchorBottom = true
+	self.CompleteExtrBut.anchorBottom = false
 	self.CompleteExtrBut:initialise();
 	self.CompleteExtrBut:instantiate();
 	--self.CompleteExtrBut.borderColor = {r=0, g=1, b=0, a=0.8};
@@ -105,7 +108,7 @@ function WQS_GPSWindow:createChildren()
 		WQS.ContactHQ)
 	self.ManageAntennaBut.internal = "MANAGE_ANTENNA_BUTTON";
 	self.ManageAntennaBut.anchorTop = false
-	self.ManageAntennaBut.anchorBottom = true
+	self.ManageAntennaBut.anchorBottom = false
 	self.ManageAntennaBut:initialise();
 	self.ManageAntennaBut:instantiate();
 	--self.ManageAntennaBut.borderColor = {r=1, g=0.93, b=0.47, a=0.8};
@@ -153,6 +156,35 @@ function WQS_GPSWindowCreate()
 	GuiAlreadyCreated = true
 end
 
+-- Resize the window and place the three action buttons at its bottom edge.
+--
+-- The buttons used to rely on anchorBottom, which does not survive this GUI's
+-- update pattern. UIElement.setHeight overwrites lastheight on every call, but
+-- UIElement.onResize (the code that shifts anchored children by
+-- parent.height - parent.lastheight) only runs once per update tick, when
+-- bResizeDirty is set. Because WQS_GPSWindowUpdate calls setHeight
+-- unconditionally, and OnPlayerMove fires it many times per tick while the
+-- player walks, the delta gets clobbered or collapsed to zero and the buttons
+-- stop tracking the bottom of the window. They then float over the text.
+--
+-- Placing them by hand removes the dependency on that delta entirely. Skipping
+-- a no-op setHeight also stops the pointless dirty churn.
+local function WQS_ApplyWindowHeight(h)
+	local win = WQS_GPSWindow
+	if not win or not win.dim then
+		return
+	end
+
+	if math.abs(win:getHeight() - h) > 0.5 then
+		win:setHeight(h)
+	end
+
+	local btnY = h - win.dim.MainPadding - win.dim.btnHgt
+	if win.ReqExtrBut then win.ReqExtrBut:setY(btnY) end
+	if win.CompleteExtrBut then win.CompleteExtrBut:setY(btnY) end
+	if win.ManageAntennaBut then win.ManageAntennaBut:setY(btnY) end
+end
+
 local function WQS_GPSWindowUpdate()
 	if not (GuiAlreadyCreated) then
 		WQS_GPSWindowCreate()
@@ -188,7 +220,7 @@ local function WQS_GPSWindowUpdate()
 			WQS_GPSWindow.nvnGPSBody:paginate()
 
 			local lockedH = WQS_GPSWindow.nvnGPSBody.height
-			WQS_GPSWindow:setHeight(lockedH + WQS_GPSWindow.dim.btnHgt +
+			WQS_ApplyWindowHeight(lockedH + WQS_GPSWindow.dim.btnHgt +
 				WQS_GPSWindow.dim.MainPadding * 4)
 			return nil
 		end
@@ -314,7 +346,7 @@ local function WQS_GPSWindowUpdate()
 
 		local myh = WQS_GPSWindow.nvnGPSBody.height
 		local FullContentHeight = myh + WQS_GPSWindow.dim.btnHgt + WQS_GPSWindow.dim.MainPadding * 4
-		WQS_GPSWindow:setHeight(FullContentHeight)
+		WQS_ApplyWindowHeight(FullContentHeight)
 		--WQS_GPSWindow:setVisible(true); --questo impedisce che venga chiusa
 	end
 end
@@ -342,6 +374,22 @@ local function RefreshWinOnPlayerUpdate()
 
 	if (NOWZ - LAST_GUI_UPDATE) > delay then
 		LAST_GUI_UPDATE = getTimeInMillis()
+		WQS_GPSWindowUpdate()
+	end
+end
+
+-- OnPlayerMove fires every frame the player is walking. Running the full
+-- rebuild that often means rebuilding the rich text string and calling
+-- paginate() dozens of times a second for a distance readout that changes by a
+-- tile at a time, so it gets its own short throttle. It shares LAST_GUI_UPDATE
+-- with the OnPlayerUpdate path, which means a move refresh also postpones the
+-- idle one-second refresh; that is intended, both do the same work.
+local function RefreshWinOnPlayerMove()
+	local NOWZ = getTimeInMillis()
+	local delay = 250
+
+	if (NOWZ - LAST_GUI_UPDATE) > delay then
+		LAST_GUI_UPDATE = NOWZ
 		WQS_GPSWindowUpdate()
 	end
 end
@@ -419,7 +467,7 @@ end
 --Events.OnCreatePlayer.Add(WQS_GPSWindowUpdate);
 
 Events.OnPlayerUpdate.Add(RefreshWinOnPlayerUpdate); --chiamo l'update della gui ogni tot secondi x ottimizzare
-Events.OnPlayerMove.Add(WQS_GPSWindowUpdate);
+Events.OnPlayerMove.Add(RefreshWinOnPlayerMove);
 
 Events.OnPlayerDeath.Add(WQS_GPSWindowOnPlayerDeath);
 
