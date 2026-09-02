@@ -458,10 +458,17 @@ local function SessionActiveToLegacy()
     for i = 1, #d.targets do
         local t = d.targets[i]
         if t.active then
+            -- x/y/z stays the target building: every legacy read path compares
+            -- it against a target list. ax/ay/az is the antenna's own square
+            -- and is only consumed by CheckStatusOfRepeaters, which has to look
+            -- at the tile the item is really on.
             out["srv" .. tostring(i)] = {
                 x = t.x,
                 y = t.y,
                 z = t.z,
+                ax = t.ax,
+                ay = t.ay,
+                az = t.az,
                 by = t.by,
                 activeForTargetRep = { area = t.area, name = t.name, x = t.x, y = t.y, z = t.z }
             }

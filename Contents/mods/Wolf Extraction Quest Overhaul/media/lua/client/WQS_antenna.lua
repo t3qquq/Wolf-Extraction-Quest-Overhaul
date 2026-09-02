@@ -113,7 +113,16 @@ WQSAntenna.CheckStatusOfRepeaters = function()
     end
     local now = getTimeInMillis()
     for k, SingleRepeater in pairs(RepeaterList) do
-        local square = getCell():getGridSquare(SingleRepeater.x, SingleRepeater.y, SingleRepeater.z)
+        -- ax/ay/az, not x/y/z: the latter is the target building and the
+        -- antenna is allowed to stand anywhere within ACTIVATION_DISTANCE of
+        -- it, so checking the target tile reported a missing antenna on every
+        -- single pass. A snapshot without ax means the server did not send the
+        -- antenna position, and guessing would only produce false reports.
+        local ax, ay, az = SingleRepeater.ax, SingleRepeater.ay, SingleRepeater.az
+        local square = nil
+        if ax and ay then
+            square = getCell():getGridSquare(ax, ay, az or 0)
+        end
         if square then
             if not IsItemOnSquare(square, WQS_Shared.getAntennaItemId()) then
                 local target = SingleRepeater.activeForTargetRep

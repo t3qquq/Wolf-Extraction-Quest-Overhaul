@@ -898,6 +898,11 @@ local function BuildSnapshot(factionKey, sess, onlineMap)
     for i = 1, #sess.Targets do
         local t = sess.Targets[i]
         local act = sess.ActiveRepeaters[RepeaterKey(t)]
+        -- x/y/z is the target building, ax/ay/az is the square the antenna
+        -- actually sits on. The client needs both and they are never the same
+        -- tile: activation only requires the antenna to be within
+        -- ACTIVATION_DISTANCE of the target, so a status check run against the
+        -- target coordinates always concludes the antenna is gone.
         table.insert(targets, {
             area = t.area,
             name = t.name,
@@ -906,6 +911,9 @@ local function BuildSnapshot(factionKey, sess, onlineMap)
             z = t.z or 0,
             active = act and true or false,
             by = act and act.by or "",
+            ax = act and act.x or nil,
+            ay = act and act.y or nil,
+            az = act and act.z or nil,
         })
     end
 
