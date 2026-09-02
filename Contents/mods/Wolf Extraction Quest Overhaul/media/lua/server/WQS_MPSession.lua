@@ -77,6 +77,24 @@ local NOFACTION_LOG_MS = 60000
 --- no timestamp to hang on and the 8-A cases cannot be told apart.
 local LastKeyByUser = {}
 
+--- Never throttled: a key transition means a session was joined, left or
+--- swapped, which happens a handful of times per session at most.
+--- Returns true when the key actually moved, which is what WatchGroupKeys
+--- uses to decide whether a push is owed. Defined this early because the poll
+--- loop needs it and Lua locals are not visible above their declaration.
+---@return boolean changed
+local function LogKeyChange(u, factionKey)
+    local cur = factionKey or "<none>"
+    local prev = LastKeyByUser[u]
+    if prev == cur then
+        return false
+    end
+    LastKeyByUser[u] = cur
+    print("WQS_MP key changed user=" .. tostring(u) ..
+        " from=" .. tostring(prev or "<unset>") .. " to=" .. cur)
+    return true
+end
+
 --- Last group mode written to the console. Also acts as the "not logged yet"
 --- flag, so the configuration dump is emitted from the poll loop rather than at
 --- file load, where SandboxVars is not populated yet.
@@ -1237,6 +1255,45 @@ local function LogGroupConfig()
     end
 end
 
+--- Server side watch on every online player's group key.
+---
+--- The client used to be the only thing that could notice a group change, and
+--- it only notices when its own Join comes back. That Join is throttled to 30s
+--- while a snapshot is held, so a player who gained or lost a group kept
+--- looking at the previous state until the throttle expired.
+---
+--- The client hooks cannot close this on their own. Vanilla does not relay
+--- SyncFaction back to the connection that sent it (GameServer.java:2345), so
+--- in mode 2 the player who created or disbanded the faction never gets the
+--- event that clears the throttle. Measured 20,417ms to notice a disband and
+--- up to 30,167ms to notice a join. Changing the group mode at runtime has the
+--- same shape: every key changes kind at once and no client is told (12,741ms).
+---
+--- The server already resolves the key every poll tick, so it pushes instead of
+--- waiting to be asked. Runs before PollSessions so a session created here is
+--- reconciled in the same tick. The client hooks stay: they still cover the
+--- window where the server push is lost (9-H).
+local function WatchGroupKeys()
+    local onlineMap = GetOnlineMap()
+    for u, p in pairs(onlineMap) do
+        local factionKey = WQS_MPSession.GetFactionKey(u)
+        if LogKeyChange(u, factionKey) then
+            if factionKey then
+                local sess = WQS_MPSession.GetSession(factionKey, true)
+                if sess then
+                    -- the joiner has to be in the roster before the snapshot is
+                    -- built, otherwise Broadcast skips the very player it is for
+                    SyncRoster(factionKey, sess)
+                    Broadcast(factionKey, sess)
+                end
+            else
+                -- an empty table deserialises as nil on the client, so never send {}
+                SendTo(p, "NoFaction", { t = 1 })
+            end
+        end
+    end
+end
+
 local function OnTickPoll()
     if not IsHost() then
         return
@@ -1261,6 +1318,9 @@ local function OnTickPoll()
         LoggedGroupMode = mode
         LogGroupConfig()
     end
+    -- must run before PollSessions: a runtime mode change rewrites every key,
+    -- and the session created here needs the same tick's reconciliation
+    WatchGroupKeys()
     PollSessions()
 end
 
@@ -1526,19 +1586,6 @@ local function LogNoFaction(u, command)
     end
     NoFactionLogged[u] = now
     print("WQS_MP command rejected, no faction user=" .. tostring(u) .. " cmd=" .. tostring(command))
-end
-
---- Never throttled: a key transition means a session was joined, left or
---- swapped, which happens a handful of times per session at most.
-local function LogKeyChange(u, factionKey)
-    local cur = factionKey or "<none>"
-    local prev = LastKeyByUser[u]
-    if prev == cur then
-        return
-    end
-    LastKeyByUser[u] = cur
-    print("WQS_MP key changed user=" .. tostring(u) ..
-        " from=" .. tostring(prev or "<unset>") .. " to=" .. cur)
 end
 
 local function DispatchCommand(player, command, args)
