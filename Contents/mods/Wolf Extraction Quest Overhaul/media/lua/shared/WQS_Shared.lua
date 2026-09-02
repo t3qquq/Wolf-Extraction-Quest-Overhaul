@@ -13,6 +13,33 @@ function WQS_Shared.DLog(msg)
     end
 end
 
+--- Same as DLog but for a state that holds across frames rather than an event.
+--- The tracker repaint, the stats compose and the context menu all run every
+--- update while a player has no session snapshot, which in group modes 2 and 3
+--- is an indefinite state: measured at roughly 58 lines per second with the
+--- tracker open, so the useful lines drown. Latched per tag, printed once on
+--- entry, cleared by WQS_Shared.DLogEdgeReset when a snapshot arrives.
+--- The debug flag is checked before latching, so turning the option on
+--- mid-session still produces one line instead of nothing.
+local DLogEdgeSeen = {}
+
+function WQS_Shared.DLogEdge(tag, msg)
+    if not SandboxVars.WQS_DebugLog_opt then
+        return
+    end
+    if DLogEdgeSeen[tag] then
+        return
+    end
+    DLogEdgeSeen[tag] = true
+    print("WQS_DBG " .. msg)
+end
+
+--- Rearms every latch. Called when a snapshot lands, so the next time the
+--- session disappears the transition is logged again.
+function WQS_Shared.DLogEdgeReset()
+    DLogEdgeSeen = {}
+end
+
 -- WQS_Shared.BGColor = {r=0.37, g=0.47, b=0.54, a=1.0}
 -- WQS_Shared.BGColorMouseOver = {r=0.25, g=0.42, b=0.63, a=1.0}; --blu ok
 -- WQS_Shared.BorderColor = {r=0.5, g=0.5, b=1, a=0.7};
@@ -152,6 +179,20 @@ WQS_Session.Data = nil
 WQS_Session.HasFaction = true
 WQS_Session.LastJoinAttempt = 0
 WQS_Session.NoFactionUntil = 0
+
+--- Window opened by a group change event during which a NoFaction reply is
+--- treated as "the server has not caught up yet" instead of "this player has
+--- no group". Vanilla fires the event on the client before the server has
+--- reconciled the roster, so the Join that the hook unblocks is answered with
+--- NoFaction and the full backoff clamps down for 30s on a membership that is
+--- about to become valid. The server normally pushes a snapshot on its own the
+--- moment its roster catches up (measured 428ms), so this only decides how long
+--- recovery takes when that push is lost.
+WQS_Session.GroupGraceUntil = 0
+
+local NO_GROUP_BACKOFF_MS = 30000
+local GROUP_GRACE_BACKOFF_MS = 5000
+local GROUP_GRACE_MS = 60000
 
 --- Singleplayer stand in for both the faction key and the username.
 --- Must match SP_KEY in server/WQS_MPSession.lua: the client finds itself in
@@ -377,6 +418,7 @@ local function WQS_OnGroupChanged(what)
     print("WQS_MP group event: " .. what)
     WQS_Session.LastJoinAttempt = 0
     WQS_Session.NoFactionUntil = 0
+    WQS_Session.GroupGraceUntil = getTimeInMillis() + GROUP_GRACE_MS
 end
 
 Events.SyncFaction.Add(function() WQS_OnGroupChanged("SyncFaction") end)
@@ -393,6 +435,7 @@ WQS_Session.OnServerMessage = function(command, args)
         local hadSnapshot = WQS_Session.Data ~= nil
         WQS_Session.HasFaction = true
         WQS_Session.Data = args
+        WQS_Shared.DLogEdgeReset()
         if not hadSnapshot then
             -- first snapshot after a join or a group swap: the only client side
             -- proof that targets and activations survived
@@ -409,8 +452,14 @@ WQS_Session.OnServerMessage = function(command, args)
     elseif command == "NoFaction" then
         WQS_Session.HasFaction = false
         WQS_Session.Data = nil
-        WQS_Session.NoFactionUntil = getTimeInMillis() + 30000
-        print("WQS_MP client: no faction or safehouse, extraction is locked")
+        local now = getTimeInMillis()
+        local backoff = NO_GROUP_BACKOFF_MS
+        if now < WQS_Session.GroupGraceUntil then
+            backoff = GROUP_GRACE_BACKOFF_MS
+        end
+        WQS_Session.NoFactionUntil = now + backoff
+        print("WQS_MP client: no faction or safehouse, extraction is locked, retry in " ..
+            tostring(backoff) .. "ms")
     elseif command == "AddTargetOk" then
         WQS_Session.OnAddTargetResult(true, args or {})
     elseif command == "AddTargetFailed" then

@@ -24,7 +24,7 @@ function WQS_ExtractionItem_context(player, context, items)
 		-- Debug level, not an error, or it fires on every right click while a
 		-- player is groupless.
 		if WQS_Shared.TableIsEmptyOrNil(ComposedStat) then
-			WQS_Shared.DLog("context menu has no session snapshot")
+			WQS_Shared.DLogEdge("nomenu", "context menu has no session snapshot")
 			return nil
 		end
 

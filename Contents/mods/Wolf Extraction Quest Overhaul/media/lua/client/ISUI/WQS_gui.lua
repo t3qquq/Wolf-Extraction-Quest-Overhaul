@@ -171,7 +171,7 @@ local function WQS_GPSWindowUpdate()
 		-- The print is a debug line, not an error: in group modes 2 and 3 this
 		-- path runs on every update for as long as a player has no group.
 		if WQS_Shared.TableIsEmptyOrNil(ComposedStat) then
-			WQS_Shared.DLog("tracker has no session snapshot, painting locked state")
+			WQS_Shared.DLogEdge("notracker", "tracker has no session snapshot, painting locked state")
 			WQS_GPSWindow.ReqExtrBut:setVisible(false)
 			WQS_GPSWindow.CompleteExtrBut:setVisible(false)
 			WQS_GPSWindow.ManageAntennaBut:setVisible(false)

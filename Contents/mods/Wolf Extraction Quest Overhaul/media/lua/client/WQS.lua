@@ -400,7 +400,7 @@ WQS.ComposeExtractionStatsTxt = function(playerObj)
     -- a groupless player sits here indefinitely, so an unconditional print
     -- buried the log under thousands of lines per session.
     if (WQS_Shared.TableIsEmptyOrNil(stats_raw)) then
-        WQS_Shared.DLog("no extraction stats, session snapshot missing")
+        WQS_Shared.DLogEdge("nostats", "no extraction stats, session snapshot missing")
         return {}
     end
 
