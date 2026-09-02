@@ -279,8 +279,10 @@ function WQS_AntennaGui:OnClickToggleRepeaterMode()
     --print("ToggleRepeaterMode")
     WQSAntenna.ToggleRepeaterMode()
 
+    -- Activation only, see populateInfoList: once it succeeds the button is
+    -- hidden rather than relabelled.
     if WQSAntenna.CurrentAntennaIsRepeater() then
-        self.ButReqNewExtrPoint.title = getText("IGUI_WQS_AntennaDeactivateRepeaterMode")
+        self.ButReqNewExtrPoint:setVisible(false)
     else
         self.ButReqNewExtrPoint.title = getText("IGUI_WQS_AntennaActivateRepeaterMode")
     end
@@ -401,10 +403,16 @@ function WQS_AntennaGui:populateInfoList(_name)
 
         WQS_AntennaGui:setDescCol(self, repColDesc)
 
+        -- No deactivate button. The server owns the active list now and only
+        -- drops a repeater once it can see for itself that the antenna is gone
+        -- (Handlers["DeactivateRepeater"]), so a button could never do anything
+        -- but print "nothing to do". Picking the antenna back up is the one
+        -- deactivation path, and it is the original mod's behaviour anyway.
         if WQSAntenna.CurrentAntennaIsRepeater() then
-            self.ButReqNewExtrPoint.title = getText("IGUI_WQS_AntennaDeactivateRepeaterMode")
+            self.ButReqNewExtrPoint:setVisible(false)
         elseif (WQSAntenna.isCurrentAntennaActivableAsRepeater()) then
             self.ButReqNewExtrPoint.title = getText("IGUI_WQS_AntennaActivateRepeaterMode")
+            self.ButReqNewExtrPoint:setVisible(true)
         else
             self.ButReqNewExtrPoint:setVisible(false)
         end
