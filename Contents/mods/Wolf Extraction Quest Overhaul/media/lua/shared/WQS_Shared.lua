@@ -117,6 +117,25 @@ WQS_Shared.FloorTxt = function(z)
     return tostring(n) .. "F"
 end
 
+---How far the target sits above or below the player, in floors.
+---An absolute pair ("5F > 3F") forces the reader to do the subtraction; what
+---they actually need to know is whether to go up, down, or nowhere.
+---@param pz number player z
+---@param tz number target z
+---@return string
+WQS_Shared.FloorDeltaTxt = function(pz, tz)
+    local a = math.floor((tonumber(pz) or 0) + 0.5)
+    local b = math.floor((tonumber(tz) or 0) + 0.5)
+    local d = b - a
+    if d == 0 then
+        return getTextOrNull("IGUI_WQS_FloorSame") or "same floor"
+    end
+    if d > 0 then
+        return getTextOrNull("IGUI_WQS_FloorAbove", tostring(d)) or (tostring(d) .. "F up")
+    end
+    return getTextOrNull("IGUI_WQS_FloorBelow", tostring(-d)) or (tostring(-d) .. "F down")
+end
+
 ---"1F > 5F": where the player stands and where the target sits.
 ---The separator is localized too because the arrow glyph is part of the
 ---translated direction strings already and must match them visually.
@@ -192,6 +211,16 @@ end
 
 WQS_Shared.getRepeaterMaxActivationDistance = function()
     local ret = 7
+    return ret
+end
+
+---Below this distance the tracker starts showing the floor difference to a
+---repeater; above it, floor delta is dropped from the line entirely.
+---At long range the player is still navigating by direction alone and cannot
+---act on floor information yet, so printing it early is just noise; it only
+---becomes actionable once they are closing in on the building.
+WQS_Shared.getRepeaterFloorHintDistance = function()
+    local ret = 50
     return ret
 end
 
@@ -728,14 +757,19 @@ WQS_Shared.RandomKeyFromTableExclude = function(mytab, exclude)
     return x
 end
 
-WQS_Shared.CardinalDirTxt = function(playerObj, destx, desty, distance)
+---Which of the eight compass sectors the destination falls into.
+---Returns the bare key part ("North", "Southwest", ...) or "" when there is
+---nothing to point at. The name and the arrow glyph used to live together in a
+---single translated string, which made it impossible to write them apart in a
+---sentence, so the decision and the wording are split here.
+---@return string
+WQS_Shared.CardinalDirId = function(playerObj, destx, desty, distance)
     local x = math.floor(playerObj:getX() - destx)
     local y = math.floor(playerObj:getY() - desty)
     local north = nil
     local south = nil
     local east = nil
     local west = nil
-    local text = ""
 
     if y < 0 then
         south = math.abs(y)
@@ -752,35 +786,71 @@ WQS_Shared.CardinalDirTxt = function(playerObj, destx, desty, distance)
     if distance > 0 then
         if south then
             if west and west > (south * 2) then
-                text = (text .. getText("IGUI_WQS_West"))
+                return "West"
             elseif west and west > (south / 2) then
-                text = (text .. getText("IGUI_WQS_Southwest"))
+                return "Southwest"
             elseif east and east > (south * 2) then
-                text = (text .. getText("IGUI_WQS_East"))
+                return "East"
             elseif east and east > (south / 2) then
-                text = (text .. getText("IGUI_WQS_Southeast"))
+                return "Southeast"
             else
-                text = (text .. getText("IGUI_WQS_South"))
+                return "South"
             end
         elseif north then
             if west and west > (north * 2) then
-                text = (text .. getText("IGUI_WQS_West"))
+                return "West"
             elseif west and west > (north / 2) then
-                text = (text .. getText("IGUI_WQS_Northwest"))
+                return "Northwest"
             elseif east and east > (north * 2) then
-                text = (text .. getText("IGUI_WQS_East"))
+                return "East"
             elseif east and east > (north / 2) then
-                text = (text .. getText("IGUI_WQS_Northeast"))
+                return "Northeast"
             else
-                text = (text .. getText("IGUI_WQS_North"))
+                return "North"
             end
         elseif west then
-            text = (text .. getText("IGUI_WQS_West"))
+            return "West"
         elseif east then
-            text = (text .. getText("IGUI_WQS_East"))
+            return "East"
         end
     end
-    return text
+    return ""
+end
+
+---Localized name of a sector id, without the arrow.
+---@param dirId string as returned by CardinalDirId
+---@return string
+WQS_Shared.CardinalDirName = function(dirId)
+    if not (dirId) or dirId == "" then
+        return ""
+    end
+    return getTextOrNull("IGUI_WQS_" .. dirId) or dirId
+end
+
+---Arrow glyph of a sector id. The glyphs are rotated 45 degrees against true
+---north on purpose: they point the way the sector looks on the isometric
+---screen, not the way a compass would. Untranslated languages simply get no
+---arrow rather than a leaked key.
+---@param dirId string as returned by CardinalDirId
+---@return string
+WQS_Shared.CardinalDirArrow = function(dirId)
+    if not (dirId) or dirId == "" then
+        return ""
+    end
+    return getTextOrNull("IGUI_WQS_Arrow" .. dirId) or ""
+end
+
+---Arrow followed by the name, the shape the rest of the GUI has always used.
+WQS_Shared.CardinalDirTxt = function(playerObj, destx, desty, distance)
+    local dirId = WQS_Shared.CardinalDirId(playerObj, destx, desty, distance)
+    if dirId == "" then
+        return ""
+    end
+    local arrow = WQS_Shared.CardinalDirArrow(dirId)
+    if arrow == "" then
+        return WQS_Shared.CardinalDirName(dirId)
+    end
+    return arrow .. " " .. WQS_Shared.CardinalDirName(dirId)
 end
 
 ---ritorna true se il punto di estrazione corrente è su una mappa modded, altrimenti falso

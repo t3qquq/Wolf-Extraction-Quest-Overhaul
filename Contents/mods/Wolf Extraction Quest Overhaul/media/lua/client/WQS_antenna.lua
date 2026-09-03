@@ -466,7 +466,7 @@ WQSAntenna.getTargetRepeatersStatsTxt = function()
         ret = ret .. WQS_COLTIT .. " <SIZE:medium> " .. knownRepLoc .. ": " .. "  <SIZE:small> <LINE> <LINE> "
         for key, Rep in pairs(TargetRepeaterList) do
             local dist = WQS.getDistance(pl:getX(), pl:getY(), Rep.x, Rep.y);
-            local dir = WQS_Shared.CardinalDirTxt(pl, Rep.x, Rep.y, dist)
+            local dirId = WQS_Shared.CardinalDirId(pl, Rep.x, Rep.y, dist)
             -- ----------------
             local pz = math.floor(pl:getZ() + 0.5)
             local tz = Rep.z or 0
@@ -481,29 +481,82 @@ WQSAntenna.getTargetRepeatersStatsTxt = function()
             if WQSAntenna.isThisTargetRepeaterActive(Rep) then
                 statusTxt = WQS_COLGREEN .. repeaterIsActive .. WQS_COLWHITE
             elseif (pz ~= tz) or (dist >= WQS_Shared.getRepeaterMaxActivationDistance()) then
-                -- Distance keeps the accent colour: it is the one number the
-                -- player actually navigates by. The floor pair stays dim while
-                -- both ends match so it does not compete with it, and turns
-                -- warning coloured only when the player has to change level.
-                -- Spacing has to go through <SPACE>; the rich text paginator
-                -- trims every token, so plain runs of spaces collapse to one.
-                local floorCol = WQS_COLDIM
-                if pz ~= tz then
-                    floorCol = WQS_COLWARN
+                -- Written as one translated sentence rather than three values
+                -- glued together, so word order stays the translator's problem.
+                -- The floor delta only appears once the player is within
+                -- getRepeaterFloorHintDistance() -- at range it is not
+                -- actionable yet and just adds clutter next to the one number
+                -- (distance) that matters for navigation.
+                --
+                -- NOTHING inside the sentence may carry its own colour tag.
+                -- A tag closes the current text chunk and the next chunk resumes
+                -- at exactly the x the previous one ended at, and <SPACE> does
+                -- not reliably reopen that gap here, so every tag dropped into
+                -- the middle of the sentence welded the words on either side of
+                -- it together (distance welded onto the heading). The line is
+                -- therefore built as plain text first and wrapped in a single
+                -- colour afterwards, which is what the original code did before
+                -- the per-value colouring was introduced.
+                local distArg = dist .. "m"
+                local dirName = WQS_Shared.CardinalDirName(dirId)
+                local dirArrow = WQS_Shared.CardinalDirArrow(dirId)
+                local showFloor = dist < WQS_Shared.getRepeaterFloorHintDistance()
+
+                -- The floor mismatch is signalled by recolouring the entire
+                -- line instead of just the delta, since a colour switch cannot
+                -- happen mid-sentence without breaking the spacing.
+                local lineCol = WQS_COLSUBTIT
+
+                if showFloor then
+                    if pz ~= tz then
+                        lineCol = WQS_COLWARN
+                    end
+                    local deltaArg = WQS_Shared.FloorDeltaTxt(pz, tz)
+
+                    if dirId == "" then
+                        -- Directly above or below the player: there is no heading
+                        -- to print and "(  )" would just be noise.
+                        statusTxt = getTextOrNull("IGUI_WQS_RepeaterDistLineNoDir", distArg, deltaArg)
+                        if not (statusTxt) then
+                            statusTxt = distArg .. ", " .. deltaArg
+                        end
+                    else
+                        statusTxt = getTextOrNull("IGUI_WQS_RepeaterDistLine", distArg, dirName, dirArrow, deltaArg)
+                        if not (statusTxt) then
+                            statusTxt = distArg .. " " .. dirName .. " " .. dirArrow .. ", " .. deltaArg
+                        end
+                    end
+                else
+                    if dirId == "" then
+                        statusTxt = getTextOrNull("IGUI_WQS_RepeaterDistLineFarNoDir", distArg)
+                        if not (statusTxt) then
+                            statusTxt = distArg
+                        end
+                    else
+                        statusTxt = getTextOrNull("IGUI_WQS_RepeaterDistLineFar", distArg, dirName, dirArrow)
+                        if not (statusTxt) then
+                            statusTxt = distArg .. " " .. dirName .. " " .. dirArrow
+                        end
+                    end
                 end
-                statusTxt = WQS_COLSUBTIT .. dist .. "m" .. WQS_COLWHITE ..
-                    WQS_SPACE .. WQS_SPACE .. dir ..
-                    WQS_SPACE .. WQS_SPACE .. floorCol .. WQS_Shared.FloorPairTxt(pz, tz) .. WQS_COLWHITE
+
+                statusTxt = lineCol .. statusTxt .. WQS_COLWHITE
             elseif not (WQS_Shared.TableIsEmptyOrNil(tryActivate)) then
                 statusTxt = WQS_COLGREEN .. youCanPlace .. WQS_COLWHITE
             end
 
-            -- Name on its own line at indent 0, status indented under it, then a
-            -- blank line so several repeaters do not read as one block. The
-            -- indent also catches the wrap when the status line is too long for
-            -- the window, keeping it aligned instead of falling back to the margin.
-            ret = ret .. " <INDENT:0> " .. WQS_COLWHITE .. li .. " " .. WQS_Shared.GetRepeaterLabel(Rep) .. " <LINE> "
-            ret = ret .. " <INDENT:14> " .. statusTxt .. " <LINE> <LINE> <INDENT:0> "
+            -- Name plus the floor it sits on, then the status sentence indented
+            -- under it, then a blank line so several repeaters do not read as one
+            -- block. Both indents also catch the wrap on a long name or a long
+            -- sentence, keeping the continuation aligned instead of dropping it
+            -- back to the margin.
+            --
+            -- The floor used to be tagged a dimmer colour, which put a tag
+            -- between the name and the floor and glued them into
+            -- the floor welded onto the name. Both are one plain run now.
+            ret = ret .. " <INDENT:8> " .. WQS_COLWHITE .. li .. " " ..
+                WQS_Shared.GetRepeaterLabel(Rep) .. " " .. WQS_Shared.FloorTxt(tz) .. " <LINE> "
+            ret = ret .. " <INDENT:18> " .. statusTxt .. " <LINE> <LINE> <INDENT:0> "
         end
     end
     return ret

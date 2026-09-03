@@ -31,7 +31,7 @@ IGUI_KO = {
     IGUI_WQS_AntennaRepeater = "중계기",
     IGUI_WQS_Zone = "구역",
     IGUI_WQS_AntennaRepeaterMode = "중계기 작동",
-    IGUI_WQS_AntennaRepeaterActive = "안테나 중계기가 활성화됨",
+    IGUI_WQS_AntennaRepeaterActive = "활성화된 중계기 안테나",
     IGUI_WQS_AntennaDeactivateRepeaterMode = "해당 안테나의 중계 모드 비활성화",
     IGUI_WQS_AntennaActivateRepeaterMode = "해당 안테나의 중계 모드 활성화",
     IGUI_WQS_HaveAllTargetAntennaRepeaterLocations = "모든 안테나 중계기의 위치를 알고있음",
@@ -40,8 +40,8 @@ IGUI_KO = {
     IGUI_WQS_AntennaRepeatersNeedMoreDet = "무선 신호가 약합니다. 발견된 중계기 구역에서 새로운 중계기를 활성화하여 신호의 강도를 높이십시오",
 
     IGUI_WQS_KnownRepeaterLocations = "중계기 위치",
-    IGUI_WQS_CanPlaceRepeater = "중계기는 이곳에서 활성화 할 수 있습니다.",
-    IGUI_WQS_CollectFragmentAdvice = "중계기 위치가 표시된 지도 조각을 모아 활성화 해야하는 중계기의 위치를 찾으십시오.",
+    IGUI_WQS_CanPlaceRepeater = "무선 안테나 아이템을 바닥에 배치하고 중계기를 활성화하십시오.",
+    IGUI_WQS_CollectFragmentAdvice = "중계기 위치 지도 조각을 모으고, 중계기를 활성화 해야하는 위치를 찾으십시오.",
     IGUI_WQS_RepeaterIsActive = "중계기 활성화",
 
     IGUI_WQS_ContactHQ = "사령부와 접선",
@@ -62,17 +62,33 @@ IGUI_KO = {
     IGUI_WQS_RandomOpt2="루이빌 내부 구역 중에서 임의로 선택"
     IGUI_WQS_RandomOpt3="루이빌 제외한 외부 구역에서 무작위로 선택"
 
-	IGUI_WQS_North = "↗ 북쪽",
-	IGUI_WQS_Northwest = "↑ 북서쪽",
-	IGUI_WQS_West = "↖ 서쪽",
-	IGUI_WQS_Southwest = "← 남서쪽",
-	IGUI_WQS_South = "↙ 남쪽",
-	IGUI_WQS_Southeast = "↓ 남동쪽",
-	IGUI_WQS_East = "↘ 동쪽",
-	IGUI_WQS_Northeast = "→ 북동쪽",
+	IGUI_WQS_North = "북쪽",
+	IGUI_WQS_Northwest = "북서쪽",
+	IGUI_WQS_West = "서쪽",
+	IGUI_WQS_Southwest = "남서쪽",
+	IGUI_WQS_South = "남쪽",
+	IGUI_WQS_Southeast = "남동쪽",
+	IGUI_WQS_East = "동쪽",
+	IGUI_WQS_Northeast = "북동쪽",
+
+	IGUI_WQS_ArrowNorth = "↗",
+	IGUI_WQS_ArrowNorthwest = "↑",
+	IGUI_WQS_ArrowWest = "↖",
+	IGUI_WQS_ArrowSouthwest = "←",
+	IGUI_WQS_ArrowSouth = "↙",
+	IGUI_WQS_ArrowSoutheast = "↓",
+	IGUI_WQS_ArrowEast = "↘",
+	IGUI_WQS_ArrowNortheast = "→",
 
 	IGUI_WQS_FloorNum = "%1층",
 	IGUI_WQS_FloorArrow = "→",
+	IGUI_WQS_FloorSame = "현재 층",
+	IGUI_WQS_FloorAbove = "%1층 위",
+	IGUI_WQS_FloorBelow = "%1층 아래",
+	IGUI_WQS_RepeaterDistLine = "현 위치로부터 %1 %2 %3, %4",
+	IGUI_WQS_RepeaterDistLineNoDir = "현 위치로부터 %1, %2",
+	IGUI_WQS_RepeaterDistLineFar = "현 위치로부터 %1 %2 %3",
+	IGUI_WQS_RepeaterDistLineFarNoDir = "현 위치로부터 %1",
 
 
 	IGUI_WQS_Heli0 = "..헬리콥터 이륙, 목적지로 향하는 중..",
