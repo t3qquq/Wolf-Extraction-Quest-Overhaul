@@ -798,6 +798,15 @@ end
 
 local LastMainStatusCheck = getTimeInMillis()
 
+--- Confined mode leave warning throttle.
+--- The warning used to ride on MainStatusCheck's own 2000ms gate, which made it
+--- fire every two seconds for as long as the player stayed out. Kept separate
+--- so the status check keeps its own cadence.
+--- Reset to 0 the moment the player is back inside, so stepping out again warns
+--- immediately instead of waiting out the remainder of the interval.
+local WQS_CONFINED_WARN_MS = 10000
+local WQS_LastConfinedWarn = 0
+
 local function MainStatusCheckUpdate()
     local NOWZ = getTimeInMillis() -- getMinutes() --os.time() --getTimeInMillis()
     local delay = 2000
@@ -886,12 +895,28 @@ WQS.MainStatusCheck = function()
         -- for grazing the edge of the zone the instant the timer stops.
         -- MapData is only set on the success path, so an empty stats table
         -- (no session snapshot yet) cannot make this spam.
-        if (SandboxVars.WQS_ConfinedMode_opt == true) and ST.MapData then
+        --
+        -- RUNNING only. Once the completion gate latches the zone stops
+        -- constraining anything: AdvanceTimer skips the ConfinedMode check for
+        -- UNLOCKED/DONE, and Handlers["Extracted"] accepts from anywhere on
+        -- purpose, so a survivor can walk back out to fetch a straggler before
+        -- confirming. Warning past that point would nag about a rule that is
+        -- no longer in force.
+        local confinedWarn = false
+        if (sstate == "RUNNING") and (SandboxVars.WQS_ConfinedMode_opt == true) and ST.MapData then
             local outOfRadius = ST.Distance_val and (ST.Distance_val > (ST.MapData.AreaRadiusFromCenter * 2))
-            if outOfRadius or not ST.Zlevel_isok then
+            confinedWarn = outOfRadius or not ST.Zlevel_isok
+        end
+
+        if confinedWarn then
+            local now = getTimeInMillis()
+            if (now - WQS_LastConfinedWarn) > WQS_CONFINED_WARN_MS then
+                WQS_LastConfinedWarn = now
                 player:Say(getText("IGUI_WQS_Out_Of_EZone"));
                 getSoundManager():playUISound("WQSBlip")
             end
+        else
+            WQS_LastConfinedWarn = 0
         end
     end
 end
