@@ -876,6 +876,33 @@ function WQS_MPSession.ClaimSound(soundname, x, y)
     return true
 end
 
+--- Is this player allowed to ask the server to spawn zombies right now?
+--- WQS_ExtractionEvent's WQS_DoServerSpawn handler takes the coordinates and
+--- the count straight from the client, so without this any connected client
+--- could spawn anything anywhere, in a session or not. The check mirrors
+--- WQS_Session.IsSelfParticipating on the client side.
+function WQS_MPSession.IsSpawnAllowed(player)
+    if not player then
+        return false
+    end
+    local factionKey = WQS_MPSession.GetFactionKey(player:getUsername())
+    if not factionKey then
+        return false
+    end
+    local sess = WQS_MPSession.GetSession(factionKey, false)
+    if not sess then
+        return false
+    end
+    if (sess.State ~= ST_RUNNING) and (sess.State ~= ST_UNLOCKED) then
+        return false
+    end
+    local u = GetUserKey(player)
+    if sess.Dead[u] or sess.Extracted[u] then
+        return false
+    end
+    return true
+end
+
 -- ##############################################################
 -- snapshot / sync
 -- ##############################################################
@@ -1658,6 +1685,6 @@ function WQS_MPSession.LocalCommand(command, args)
 end
 
 Events.OnClientCommand.Add(OnClientCommand)
-Events.OnTick.Add(OnTickPoll)
+Events.OnTickEvenPaused.Add(OnTickPoll)
 
 print("WQS_MP session module loaded, host=" .. tostring(IsHost()) .. " sp=" .. tostring(IsSinglePlayer()))

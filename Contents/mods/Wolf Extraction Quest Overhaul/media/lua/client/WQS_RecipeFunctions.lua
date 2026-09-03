@@ -139,7 +139,7 @@ function WQS_Recipe.RequestExtraction(recipe, result, player)
         player:Say("Too far from extraction zone! ("..tostring(distance)..")");
     end
 
-    if (not(player:getZ()==MapData.MapCenterAreaZ) and (distance<MapData.AreaRadiusFromCenter*4) )then
+    if (not(math.floor(player:getZ()+0.5)==MapData.MapCenterAreaZ) and (distance<MapData.AreaRadiusFromCenter*4) )then
         player:Say("The height level is wrong! "..tostring(player:getZ()).." -> "..MapData.MapCenterAreaZ );
     end
 
@@ -156,7 +156,7 @@ function WQS_Recipe.RequestExtraction(recipe, result, player)
         end
     end
 
-    if ( (distance<=MapData.AreaRadiusFromCenter) and (player:getZ()==MapData.MapCenterAreaZ) and (in_time) )then
+    if ( (distance<=MapData.AreaRadiusFromCenter) and (math.floor(player:getZ()+0.5)==MapData.MapCenterAreaZ) and (in_time) )then
         player:Say("OK! Requesting Extraction "..tostring(distance).." -> "..CurretExtractionMap );
         testHelicopter();--dovrei fare una funzione simile mia invece di usare quella vanilla?
     end

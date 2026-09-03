@@ -414,7 +414,7 @@ WQS.ComposeExtractionStatsTxt = function(playerObj)
     stats.data = stats_raw
 
     stats.MainLabel = getText("IGUI_WQS_MainLabel") or "Extractionz"
-    stats.MapGuiLabel = stats_raw.MapNameLabel
+    stats.MapGuiLabel = stats_raw.MapNameLabel .. " " .. WQS_Shared.FloorTxt(stats_raw.Zlevel_val)
 
     -- local ReqExtractionLabel=getText("ContextMenu_ReqExtractionLabel")
     -- stats.ReqExtractionLabel="Request Extraction"	
@@ -470,7 +470,7 @@ WQS.ComposeExtractionStatsTxt = function(playerObj)
 
     -- Same floor numbering as the repeater list, otherwise the two panels of the
     -- same window would disagree about what "the fifth floor" is called.
-    local sr = WQS_Shared.FloorPairTxt(playerObj:getZ(), stats_raw.Zlevel_val)
+    local sr = WQS_Shared.FloorDeltaTxt(playerObj:getZ(), stats_raw.Zlevel_val)
 
     if stats_raw.Zlevel_isok then
         --stats.ZlevelLabel = stats.ZlevelLabel .. tostring(sr) .. " OK! "
@@ -904,7 +904,7 @@ WQS.MainStatusCheck = function()
         -- no longer in force.
         local confinedWarn = false
         if (sstate == "RUNNING") and (SandboxVars.WQS_ConfinedMode_opt == true) and ST.MapData then
-            local outOfRadius = ST.Distance_val and (ST.Distance_val > (ST.MapData.AreaRadiusFromCenter * 2))
+            local outOfRadius = ST.Distance_val and (ST.Distance_val > ST.MapData.AreaRadiusFromCenter)
             confinedWarn = outOfRadius or not ST.Zlevel_isok
         end
 

@@ -257,7 +257,6 @@ WQSAntenna.FindTargetRepeaterForActivation = function(x, y, isNotForActivation)
     local TargetRepeaterList = WQS_Shared.getWQSPlayerModData("TargetRepeaterList")
     local ActiveRepeaterList = WQS_Shared.getWQSPlayerModData("ActiveRepeaterList")
 
-    local thereAreOtherRepActivatedHere = false --deve essere false
     local TargetRepeaterForActivation = {}
 
     if (not (TargetRepeaterList) or WQS_Shared.TableIsEmptyOrNil(TargetRepeaterList) or
@@ -271,6 +270,12 @@ WQSAntenna.FindTargetRepeaterForActivation = function(x, y, isNotForActivation)
 
     --controllo se sono nel range di attivazione di uno dei target repeater
     for i, Rep in pairs(TargetRepeaterList) do
+        -- Per target, not per call. Hoisted out of the loop it latched on the
+        -- first occupied target and every free one after it was then treated as
+        -- occupied too. Only reachable when two targets sit inside the same
+        -- activation radius, which PickRepeater's spacing rules normally
+        -- prevent, but its last resort branch can produce.
+        local thereAreOtherRepActivatedHere = false --deve essere false
         local dist = WQS.getDistance(x, y, Rep.x, Rep.y);
         -- print(dist)
         if dist <= WQS_Shared.getRepeaterMaxActivationDistance() then

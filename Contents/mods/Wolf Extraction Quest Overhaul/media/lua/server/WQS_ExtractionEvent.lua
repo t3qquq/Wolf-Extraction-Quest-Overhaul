@@ -20,6 +20,21 @@ local SpawnedZedList = ArrayList.new()
 local failsafe_spawn_loc = {}
 local already_spawned = 0
 
+-- Guards for the client commands handled at the bottom of this file. Every
+-- one of them takes its payload straight off the wire, so the values are
+-- clamped rather than trusted. The distance cap is generous on purpose: the
+-- preferred spawn points of a zone sit up to ~30 tiles from its centre and the
+-- player is not always standing in the zone, but nothing legitimate ever asks
+-- to spawn on the far side of the map.
+local WQS_MAX_SPAWN_PER_REQUEST = 12
+local WQS_MAX_SPAWN_DIST = 200
+local WQS_MAX_SPAWN_Z = 7
+-- failsafe_spawn_loc is only ever appended to, so without a cap it grew for
+-- the whole session and the fallback could pick a location from a stage the
+-- player left kilometres behind.
+local WQS_FAILSAFE_MAX = 24
+local WQS_ALLOWED_SOUNDS = { WQSHeli1 = true, WQSHeli2 = true, WQSHeli3 = true }
+
 local oldstage = -1
 local ExtractionCurrentStage = -1
 
@@ -98,8 +113,13 @@ local function ForceEmitSoundOnPlayer(displace, added_range)
 
     local sLocationX = math.ceil(pl:getX() + displace)
     local sLocationY = math.ceil(pl:getY() + displace)
+    -- was: sLocationX = 0 - sLocationX
+    -- That negates the world coordinate, not the offset, so the sound landed
+    -- off the map instead of on the other side of the player. Unreachable
+    -- today (every caller passes displace 0) but it would fire the moment the
+    -- displacement is used again.
     if ((ZombRand(2) == 0) and (displace > 0)) then
-        sLocationX = 0 - sLocationX;
+        sLocationX = math.ceil(pl:getX() - displace)
     end
     -- getWorldSoundManager():addSound(hPlayer, hPlayer:getCurrentSquare():getX(), hPlayer:getCurrentSquare():getY(), hPlayer:getCurrentSquare():getZ(), 200, 10);
     addSound(pl, sLocationX, sLocationY, pl:getZ(), range, 100);
@@ -167,11 +187,16 @@ local function FindSpawnLocation()
 
 
     -- La distanza a cui spawnano gli zombie è minore quanto maggiore è la Z level del player
-    SpawnCFG.spawn_min_dist_from_player = (SpawnCFG.spawn_min_dist_from_player - (math.floor(pLocation:getZ() * 1.5))) or
-        15
-
-    if SpawnCFG.spawn_min_dist_from_player < 15 then
-        SpawnCFG.spawn_min_dist_from_player = 15
+    --
+    -- This used to write back into SpawnCFG, which is a module local shared by
+    -- every call. The subtraction therefore compounded on each pass and the
+    -- "below the player" branch inside the loop overwrote the shared value
+    -- outright, so once a player had spawned zombies from anywhere above
+    -- ground the minimum distance stayed pinned at 6-10 tiles for the rest of
+    -- the session, on ground level included. Derived per call now.
+    local min_dist = SpawnCFG.spawn_min_dist_from_player - math.floor(pLocation:getZ() * 1.5)
+    if min_dist < 15 then
+        min_dist = 15
     end
 
     for i = 1, SpawnCFG.spawn_location_maxloops do
@@ -196,19 +221,22 @@ local function FindSpawnLocation()
         end
 
         --se devo spawnare zed sotto il player riduco la distanza
+        -- Per iteration: target_z is recomputed every pass, so the reduction
+        -- has to be too. It must not leak back into min_dist.
+        local iter_dist = min_dist
         if target_z < pLocation:getZ() then
-            SpawnCFG.spawn_min_dist_from_player = 6 + ZombRand(5)
+            iter_dist = 6 + ZombRand(5)
         end
 
         if ZombRand(2) == 0 then
-            zLocationX = ZombRand(5) - 5 + SpawnCFG.spawn_min_dist_from_player;
-            zLocationY = ZombRand(SpawnCFG.spawn_min_dist_from_player * 2) - SpawnCFG.spawn_min_dist_from_player;
+            zLocationX = ZombRand(5) - 5 + iter_dist;
+            zLocationY = ZombRand(iter_dist * 2) - iter_dist;
             if ZombRand(2) == 0 then
                 zLocationX = 0 - zLocationX;
             end
         else
-            zLocationY = ZombRand(5) - 5 + SpawnCFG.spawn_min_dist_from_player;
-            zLocationX = ZombRand(SpawnCFG.spawn_min_dist_from_player * 2) - SpawnCFG.spawn_min_dist_from_player;
+            zLocationY = ZombRand(5) - 5 + iter_dist;
+            zLocationX = ZombRand(iter_dist * 2) - iter_dist;
             if ZombRand(2) == 0 then
                 zLocationY = 0 - zLocationY;
             end
@@ -233,6 +261,9 @@ local function FindSpawnLocation()
                 sl.x = zLocationX
                 sl.y = zLocationY
                 sl.z = target_z or 0
+                if #failsafe_spawn_loc >= WQS_FAILSAFE_MAX then
+                    table.remove(failsafe_spawn_loc, 1)
+                end
                 table.insert(failsafe_spawn_loc, sl)
                 -- print("OK Found place to spawn: " .. "x: " .. tostring(sl.x) .. " y: " .. tostring(sl.y))
                 break
@@ -262,8 +293,12 @@ end
 
 local function SpawnZed(x, y, z, howmany, is_smart)
     howmany = howmany or 1
-    is_smart = is_smart or true
-    is_smart = true --people complain, force disabled
+    -- was: is_smart = is_smart or true, then is_smart = true
+    -- "false or true" is true, so the parameter never meant anything, and the
+    -- line below then forced it on while its own comment said disabled. The
+    -- server side handler has always run with it off; singleplayer now matches
+    -- instead of mutating the global ZombieLore sandbox on every spawn.
+    is_smart = false --people complain, force disabled
 
     local COGNITION_SMART = 1
     local MEMORY_LONG = 1
@@ -425,7 +460,12 @@ local function UpdateNumToSpawnFromPopMultiplier()
 
     -- https://onecompiler.com/lua/3zaegnnqf
     -- 1.0-> 13 15 17  tot=90  2.0-> 21 23 25  tot=138 3.0-> 28 30 32  tot=180
-    SpawnCFG.total_to_spawn = 2 + math.ceil(7.8 * PopMultiplier + 0.5) + 1000 +
+    -- The "+ 1000" that used to sit here came from the ZG sub mod, not from the
+    -- original quest. It put the cap out of reach, so the spawner never left
+    -- its first branch: the additional-zed path below SpawnManager's else was
+    -- dead code, the per stage budget was meaningless, and the difficulty
+    -- multiplier only survived in zxspawn (1 zed below 1.3, 2 up to 2.0).
+    SpawnCFG.total_to_spawn = 2 + math.ceil(7.8 * PopMultiplier + 0.5) +
         (ExtractionCurrentStage * 3) -- 1.0-> 12 14 16  tot=84   2.0-> 20 22 24  tot=132  3.0-> 28 30 32  tot=180
 
     if ExtractionCurrentStage > 0 then
@@ -492,6 +532,7 @@ WQS_ExtractionEvent = function()
         oldstage = ExtractionCurrentStage
         already_spawned = 0             -- resetto così ricomincia lo spawn ad ogni fase
         AlreadyEmittedSoundPerStage = 0 -- resetto così ricomincia l'emissione di suoni ad ogni fase
+        failsafe_spawn_loc = {}         -- locations from the previous stage are stale
 
         -- EmitSoundOnPlayer(true) --suono al cambio stage così gli zombie non si dimenticano del player
         UpdateNumToSpawnFromPopMultiplier()
@@ -622,10 +663,28 @@ function WQS_OnClientCommand(WQS_module, WQS_command, WQS_player, WQS_args)
     --print("*** WQS Player WQS_OnClientCommand "..WQS_player:getDisplayName().." has send ClientCommand, module: " .. WQS_module .. "  command: " .. WQS_command);
 
     if WQS_command == "WQS_DoStartStorm" then
+        -- Every member of the faction reaches stage 2 at the same moment and
+        -- every one of them sends this, so without the claim the server ran
+        -- stopWeatherAndThunder + triggerCustomWeatherStage once per player and
+        -- the weather visibly reset that many times. WQS_MPSession has held the
+        -- arbiter since the session rework; it was simply never called.
+        if WQS_MPSession and not WQS_MPSession.ClaimStorm(WQS_player) then
+            return
+        end
+
+        local stage = tonumber(WQS_args["stage"]) or 8
+        local duration = tonumber(WQS_args["duration"]) or 3
+        if (stage < 0) or (stage > 12) then
+            print("WQS storm request rejected, bad stage " .. tostring(WQS_args["stage"]))
+            return
+        end
+        if duration < 1 then duration = 1 end
+        if duration > 12 then duration = 12 end
+
         getGameTime():setThunderDay(true)
         getClimateManager():stopWeatherAndThunder()
         --getClimateManager():triggerCustomWeatherStage(8, 1);
-        getClimateManager():triggerCustomWeatherStage(WQS_args["stage"], WQS_args["duration"]);
+        getClimateManager():triggerCustomWeatherStage(stage, duration);
     end
 
     if WQS_command == "WQS_DoStopStorm" then
@@ -633,20 +692,65 @@ function WQS_OnClientCommand(WQS_module, WQS_command, WQS_player, WQS_args)
     end
 
     if WQS_command == "WQS_PlaySound" then
+        local soundname = tostring(WQS_args["soundname"])
+        if not WQS_ALLOWED_SOUNDS[soundname] then
+            print("WQS sound request rejected, unknown sound " .. soundname)
+            return
+        end
+
         local sq = WQS_player:getCurrentSquare()
         --playServerSound("WQSHeli1",sq)
         if sq then
-            playServerSound(WQS_args["soundname"], sq)
+            -- Same reason as the storm: N members standing together produced N
+            -- overlapping helicopter cues. Positional, so members spread across
+            -- the map still each get their own.
+            if WQS_MPSession and not WQS_MPSession.ClaimSound(soundname, sq:getX(), sq:getY()) then
+                print("WQS sound suppressed, " .. soundname .. " already played nearby")
+                return
+            end
+            playServerSound(soundname, sq)
         end
     end
 
     if WQS_command == "WQS_DoServerSpawn" then
         --print("server has received WQS_DoServerSpawn command");
 
-        local zedx = WQS_args["zedx"]
-        local zedy = WQS_args["zedy"]
-        local zedz = WQS_args["zedz"]
-        local howmany = WQS_args["howmanyzed"]
+        -- Coordinates and count arrive from the client, so nothing here is
+        -- trusted: the sender must be a live participant of a running session
+        -- and every value is clamped. Previously a single crafted packet could
+        -- spawn any number of zombies anywhere on the map.
+        if not (WQS_MPSession and WQS_MPSession.IsSpawnAllowed(WQS_player)) then
+            print("WQS spawn request rejected, sender is not in a running session: " ..
+                tostring(WQS_player and WQS_player:getUsername()))
+            return
+        end
+
+        local zedx = tonumber(WQS_args["zedx"])
+        local zedy = tonumber(WQS_args["zedy"])
+        local zedz = tonumber(WQS_args["zedz"]) or 0
+        local howmany = tonumber(WQS_args["howmanyzed"]) or 1
+
+        if (not zedx) or (not zedy) then
+            print("WQS spawn request rejected, bad coordinates")
+            return
+        end
+
+        local ddx = zedx - WQS_player:getX()
+        local ddy = zedy - WQS_player:getY()
+        if math.sqrt((ddx * ddx) + (ddy * ddy)) > WQS_MAX_SPAWN_DIST then
+            print("WQS spawn request rejected, " .. math.floor(math.sqrt((ddx * ddx) + (ddy * ddy))) ..
+                " tiles from the sender, cap is " .. WQS_MAX_SPAWN_DIST)
+            return
+        end
+
+        if howmany < 1 then howmany = 1 end
+        if howmany > WQS_MAX_SPAWN_PER_REQUEST then
+            print("WQS spawn request clamped, asked for " .. howmany)
+            howmany = WQS_MAX_SPAWN_PER_REQUEST
+        end
+        if zedz < 0 then zedz = 0 end
+        if zedz > WQS_MAX_SPAWN_Z then zedz = WQS_MAX_SPAWN_Z end
+
         --local is_smart = WQS_args["is_smart"]
         local is_smart = false --people complain, disabled
 

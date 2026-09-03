@@ -92,10 +92,13 @@ WQS_COLWARN = " <RGB:1,0.62,0.22> "
 
 --#f58500 -> color(srgb 0.96 0.52 0)
 
+---Wraps txt in a colour tag and restores white afterwards.
+---restoreWhite used to be "restoreWhite or true", which is true for every
+---input including false, so the parameter never did anything. Compared against
+---an explicit false now; every existing caller omits it and is unaffected.
 WQS_Shared.GuiCol = function(col, txt, restoreWhite)
-    restoreWhite = restoreWhite or true
     local ret = col .. txt
-    if restoreWhite then
+    if restoreWhite ~= false then
         ret = ret .. WQS_COLWHITE
     end
     return ret
