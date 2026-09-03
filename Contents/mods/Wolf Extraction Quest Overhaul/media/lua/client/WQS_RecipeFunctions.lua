@@ -19,7 +19,7 @@ function WQS_Recipe.DrawExtractionMap(recipe, result, player)
         if extraction_map then
             local cmap = WQS.getExtractionData(cmapId)
             if cmap then
-                extraction_map:setName(cmap.MapGuiLabel .. " " .. getText("IGUI_WQS_ExtrMapLabel"))
+                extraction_map:setName(WQS_Shared.GetZoneLabel(cmap.MapGuiLabel) .. " " .. getText("IGUI_WQS_ExtrMapLabel"))
             end
         end
     else

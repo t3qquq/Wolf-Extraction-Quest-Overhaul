@@ -873,6 +873,69 @@ WQS_Shared.GetRepeaterRequiredMod = function(rep)
     return WQS_RepeaterMapRequirement.byArea[rep.area]
 end
 
+--- ---------------------------------------------------------------------------
+--- Display labels
+--- ---------------------------------------------------------------------------
+--- Repeater and extraction point names are plain English strings in the data
+--- tables, and the repeater ones double as identity keys ("<area>|<name>") in
+--- modData, in the server protocol and in WQS_RepeaterMapRequirement. They must
+--- therefore never be translated at the source. Translation happens at draw
+--- time only: the key is derived from the English string, and a missing entry
+--- falls back to the original so a newly added location stays readable before
+--- anyone writes a translation for it.
+---
+--- getTextOrNull is used rather than comparing getText's result to the key:
+--- with Core.bDebug and the TranslationPrefix debug option on, getText prepends
+--- "!" to a missing key, which would defeat an equality check.
+local WQS_RepLabelCache = {}
+local WQS_ZoneLabelCache = {}
+
+---Sanitizes an English label into a translation key fragment.
+---Everything that is not a letter or a digit becomes an underscore, so
+---"St Paulo's Hammer" -> "St_Paulo_s_Hammer".
+local function WQS_LabelKeyPart(s)
+    local out = string.gsub(tostring(s), "[^%w]", "_")
+    return out
+end
+
+---Localized "<area> <name>" for a repeater, English when untranslated.
+---Key: IGUI_WQS_Rep_<area>_<name>
+WQS_Shared.GetRepeaterLabel = function(rep)
+    if not (rep) or not (rep.area) or not (rep.name) then
+        return ""
+    end
+
+    local plain = tostring(rep.area) .. " " .. tostring(rep.name)
+    if WQS_RepLabelCache[plain] then
+        return WQS_RepLabelCache[plain]
+    end
+
+    local key = "IGUI_WQS_Rep_" .. WQS_LabelKeyPart(rep.area) .. "_" .. WQS_LabelKeyPart(rep.name)
+    local label = getTextOrNull(key) or plain
+    WQS_RepLabelCache[plain] = label
+    return label
+end
+
+---Localized MapGuiLabel for an extraction point, English when untranslated.
+---Key: IGUI_WQS_Zone_<MapGuiLabel>
+---Takes the raw label rather than the map table so the callers that only hold
+---a string (the map item name, the antenna list) can use it too.
+WQS_Shared.GetZoneLabel = function(mapGuiLabel)
+    if not (mapGuiLabel) or mapGuiLabel == "" then
+        return ""
+    end
+
+    local plain = tostring(mapGuiLabel)
+    if WQS_ZoneLabelCache[plain] then
+        return WQS_ZoneLabelCache[plain]
+    end
+
+    local key = "IGUI_WQS_Zone_" .. WQS_LabelKeyPart(plain)
+    local label = getTextOrNull(key) or plain
+    WQS_ZoneLabelCache[plain] = label
+    return label
+end
+
 ---Bounding box of every cell the world actually loaded, in world coordinates.
 ---Cached: the loaded map set cannot change during a session.
 local WQS_MapBounds = nil

@@ -465,7 +465,7 @@ WQSAntenna.getTargetRepeatersStatsTxt = function()
         -- r=0.13, g=0.52, b=0.82
         ret = ret .. WQS_COLTIT .. " <SIZE:medium> " .. knownRepLoc .. ": " .. "  <SIZE:small> <LINE> <LINE> "
         for key, Rep in pairs(TargetRepeaterList) do
-            ret = ret .. " <INDENT:0> " .. WQS_COLWHITE .. li .. Rep.area .. " " .. Rep.name .. " <LINE> "
+            ret = ret .. " <INDENT:0> " .. WQS_COLWHITE .. li .. WQS_Shared.GetRepeaterLabel(Rep) .. " <LINE> "
             local dist = WQS.getDistance(pl:getX(), pl:getY(), Rep.x, Rep.y);
             local dir = WQS_Shared.CardinalDirTxt(pl, Rep.x, Rep.y, dist)
             -- ----------------

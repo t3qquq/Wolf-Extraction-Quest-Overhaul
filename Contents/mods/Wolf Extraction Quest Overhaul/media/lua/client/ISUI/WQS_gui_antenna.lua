@@ -138,7 +138,7 @@ function WQS_AntennaGui:onClickMainActionBut()
         local cmap = WQS.getExtractionData(WQS.getCurretExtractionMap())
         local MapLabel = ""
         if (cmap) and (cmap.MapGuiLabel) then
-            MapLabel = cmap.MapGuiLabel
+            MapLabel = WQS_Shared.GetZoneLabel(cmap.MapGuiLabel)
         end
         local NewExtrDone = getText("IGUI_WQS_ReqNewExtractionPointDone") .. ln .. MapLabel .. ln
         local MapCraftInfo = getText("IGUI_WQS_ExtractionMapCraftInfo")
@@ -184,7 +184,10 @@ function WQS_AntennaGui:OnInfoListMouseDown(item)
     end
     if (item and MapData and not (WQS_Shared.TableIsEmptyOrNil(MapData))) then
         --print("MapData is valid")
-        local newExtrTarget = MapData.MapGuiLabel or "---"
+        local newExtrTarget = WQS_Shared.GetZoneLabel(MapData.MapGuiLabel)
+        if newExtrTarget == "" then
+            newExtrTarget = "---"
+        end
         self.ButReqNewExtrPoint.title = getText("IGUI_WQS_SetExtractionToBut") .. " " .. newExtrTarget
 
         local pl = WQS.GetCurrentPlayer();
@@ -314,7 +317,7 @@ function WQS_AntennaGui:populateInfoList(_name)
 
         --print("ReqNewExtrPoint")
         if (MapData and MapData.MapGuiLabel) then
-            current = MapData.MapGuiLabel
+            current = WQS_Shared.GetZoneLabel(MapData.MapGuiLabel)
         end
 
         if not (WQS.QuestNotStarted()) then
@@ -344,7 +347,7 @@ function WQS_AntennaGui:populateInfoList(_name)
 
         local added_item
         for k, v in pairs(WQS_ExtractionPointsData) do
-            local mapLabel = WQS_ExtractionPointsData[k].MapGuiLabel
+            local mapLabel = WQS_Shared.GetZoneLabel(WQS_ExtractionPointsData[k].MapGuiLabel)
             local mapItemId = WQS_ExtractionPointsData[k].MapItem
             local mapX = WQS_ExtractionPointsData[k].MapCenterAreaX
             --print(mapLabel,mapItemId,mapX)
@@ -432,7 +435,7 @@ function WQS_AntennaGui:populateInfoList(_name)
                 local tryActivate = WQSAntenna.FindTargetRepeaterForThisCoords(Rep.x, Rep.y)
                 --print(WQS_Shared.Dump(tryActivate));
                 if tryActivate and not (WQS_Shared.TableIsEmptyOrNil(tryActivate)) and tryActivate.area then
-                    RepItemName = "    -> " .. repLabel .. ": " .. tryActivate.area .. " " .. tryActivate.name
+                    RepItemName = "    -> " .. repLabel .. ": " .. WQS_Shared.GetRepeaterLabel(tryActivate)
                 end
 
                 self.infoList:addItem(RepItemName, RepId);

@@ -290,7 +290,7 @@ WQS.getActualExtractionStats = function(player)
 
     ret.MapData = MapData
 
-    ret.MapNameLabel = MapData.MapGuiLabel or ""
+    ret.MapNameLabel = WQS_Shared.GetZoneLabel(MapData.MapGuiLabel)
 
     local distance = WQS.getDistance(player:getX(), player:getY(), MapData.MapCenterAreaX, MapData.MapCenterAreaY);
     ret.Distance_val = distance
@@ -975,7 +975,7 @@ WQS.AddExtractionPointToWorldMap = function()
             self:drawRect(x - 4, y - 4, 8, 8, 1, 0, 1, 0) -- bordo
             self:drawRect(x - 3, y - 3, 6, 6, 1, 0.13, 0.52, 0.82)
 
-            local member_name = cmap.MapGuiLabel
+            local member_name = WQS_Shared.GetZoneLabel(cmap.MapGuiLabel)
             local name_size = getTextManager():MeasureStringX(UIFont.NewSmall, member_name)
             self:drawRect(x - 4, y + 8, name_size + 8, 18, 0.5, 0, 0, 0)
             self:drawText(member_name, x, y + 9, 1, 1, 1, 1, UIFont.NewSmall)
