@@ -16,7 +16,7 @@ IGUI_KO = {
     IGUI_WQS_StatusExtraction6 = "도착 예정",
     IGUI_WQS_StatusExtraction9 = "탈출 완료!!",
 
-    IGUI_WQS_ZlevelLabel = "고도",
+    IGUI_WQS_ZlevelLabel = "층수",
     IGUI_WQS_HoursLeftLabel = "남은 시간",
     IGUI_WQS_DeadLineLabel = "제한 시간",
     IGUI_WQS_HoursLabel = "시간",
@@ -70,6 +70,9 @@ IGUI_KO = {
 	IGUI_WQS_Southeast = "↓ 남동쪽",
 	IGUI_WQS_East = "↘ 동쪽",
 	IGUI_WQS_Northeast = "→ 북동쪽",
+
+	IGUI_WQS_FloorNum = "%1층",
+	IGUI_WQS_FloorArrow = "→",
 
 
 	IGUI_WQS_Heli0 = "..헬리콥터 이륙, 목적지로 향하는 중..",

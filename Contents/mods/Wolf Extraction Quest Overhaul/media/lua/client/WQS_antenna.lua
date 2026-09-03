@@ -465,7 +465,6 @@ WQSAntenna.getTargetRepeatersStatsTxt = function()
         -- r=0.13, g=0.52, b=0.82
         ret = ret .. WQS_COLTIT .. " <SIZE:medium> " .. knownRepLoc .. ": " .. "  <SIZE:small> <LINE> <LINE> "
         for key, Rep in pairs(TargetRepeaterList) do
-            ret = ret .. " <INDENT:0> " .. WQS_COLWHITE .. li .. WQS_Shared.GetRepeaterLabel(Rep) .. " <LINE> "
             local dist = WQS.getDistance(pl:getX(), pl:getY(), Rep.x, Rep.y);
             local dir = WQS_Shared.CardinalDirTxt(pl, Rep.x, Rep.y, dist)
             -- ----------------
@@ -474,24 +473,37 @@ WQSAntenna.getTargetRepeatersStatsTxt = function()
 
             local tryActivate = WQSAntenna.FindTargetRepeaterForActivation(Rep.x, Rep.y)
 
-            local distTxt = ""
-            local canPlaceTxt = ""
-            local isActiveTxt = ""
+            -- Exactly one of the three states applies, so they are a single
+            -- chain now instead of the old "build a string, then blank it out
+            -- again further down" sequence.
+            local statusTxt = ""
             -- ----------------
-            if (pz ~= tz) or (dist >= WQS_Shared.getRepeaterMaxActivationDistance()) then
-                distTxt = WQS_COLSUBTIT .. dist .. "m " .. dir .. " " .. tostring(pz) .. "/" .. tostring(tz) .. WQS_COLWHITE
-            elseif not (WQS_Shared.TableIsEmptyOrNil(tryActivate)) then
-                distTxt = ""
-                canPlaceTxt = WQS_COLGREEN .. youCanPlace .. WQS_COLWHITE
-            end
             if WQSAntenna.isThisTargetRepeaterActive(Rep) then
-                isActiveTxt = WQS_COLGREEN .. repeaterIsActive .. WQS_COLWHITE
-                distTxt = ""
-                canPlaceTxt = ""
+                statusTxt = WQS_COLGREEN .. repeaterIsActive .. WQS_COLWHITE
+            elseif (pz ~= tz) or (dist >= WQS_Shared.getRepeaterMaxActivationDistance()) then
+                -- Distance keeps the accent colour: it is the one number the
+                -- player actually navigates by. The floor pair stays dim while
+                -- both ends match so it does not compete with it, and turns
+                -- warning coloured only when the player has to change level.
+                -- Spacing has to go through <SPACE>; the rich text paginator
+                -- trims every token, so plain runs of spaces collapse to one.
+                local floorCol = WQS_COLDIM
+                if pz ~= tz then
+                    floorCol = WQS_COLWARN
+                end
+                statusTxt = WQS_COLSUBTIT .. dist .. "m" .. WQS_COLWHITE ..
+                    WQS_SPACE .. WQS_SPACE .. dir ..
+                    WQS_SPACE .. WQS_SPACE .. floorCol .. WQS_Shared.FloorPairTxt(pz, tz) .. WQS_COLWHITE
+            elseif not (WQS_Shared.TableIsEmptyOrNil(tryActivate)) then
+                statusTxt = WQS_COLGREEN .. youCanPlace .. WQS_COLWHITE
             end
 
-            ret = ret .. "  <INDENT:7>  " .. distTxt .. " " .. canPlaceTxt .. " " .. isActiveTxt
-            ret = ret .. " <LINE> <INDENT:0>"
+            -- Name on its own line at indent 0, status indented under it, then a
+            -- blank line so several repeaters do not read as one block. The
+            -- indent also catches the wrap when the status line is too long for
+            -- the window, keeping it aligned instead of falling back to the margin.
+            ret = ret .. " <INDENT:0> " .. WQS_COLWHITE .. li .. " " .. WQS_Shared.GetRepeaterLabel(Rep) .. " <LINE> "
+            ret = ret .. " <INDENT:14> " .. statusTxt .. " <LINE> <LINE> <INDENT:0> "
         end
     end
     return ret

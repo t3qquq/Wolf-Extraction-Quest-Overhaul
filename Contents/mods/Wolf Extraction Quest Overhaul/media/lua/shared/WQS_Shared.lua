@@ -83,6 +83,11 @@ WQS_COLRED = " <RGB:1,0,0> "
 --WQS_COLSUBTIT2 = " <RGB:0.12,0.56,1> " --dodgerblue
 --WQS_COLSUBTIT2 = " <RGB:0.12,0.72,1> "     --dodgerblue
 WQS_COLSUBTIT2 = " <RGB:0.20,0.66,0.85> "
+--Secondary readouts that must stay readable without pulling the eye: the floor
+--pair when the player is already on the target floor.
+WQS_COLDIM = " <RGB:0.58,0.58,0.58> "
+--Something the player has to act on but that is not an error: a floor mismatch.
+WQS_COLWARN = " <RGB:1,0.62,0.22> "
 
 
 --#f58500 -> color(srgb 0.96 0.52 0)
@@ -94,6 +99,33 @@ WQS_Shared.GuiCol = function(col, txt, restoreWhite)
         ret = ret .. WQS_COLWHITE
     end
     return ret
+end
+
+---Turn a raw z level into a floor number the way a player counts them.
+---The GUI used to print z straight ("0/4"), which reads as an altitude and, worse,
+---has exactly the same "n/m" shape as the signal strength counter printed a few
+---lines above it in the same window. Ground level is floor 1, so shift by one and
+---let the translation attach the unit.
+---@param z number raw z level, 0 based
+---@return string
+WQS_Shared.FloorTxt = function(z)
+    local n = math.floor((tonumber(z) or 0) + 0.5) + 1
+    local txt = getTextOrNull("IGUI_WQS_FloorNum", tostring(n))
+    if txt then
+        return txt
+    end
+    return tostring(n) .. "F"
+end
+
+---"1F > 5F": where the player stands and where the target sits.
+---The separator is localized too because the arrow glyph is part of the
+---translated direction strings already and must match them visually.
+---@param pz number player z
+---@param tz number target z
+---@return string
+WQS_Shared.FloorPairTxt = function(pz, tz)
+    local sep = getTextOrNull("IGUI_WQS_FloorArrow") or "->"
+    return WQS_Shared.FloorTxt(pz) .. " " .. sep .. " " .. WQS_Shared.FloorTxt(tz)
 end
 
 WQS_Shared.HaveItemInInventory = function(itemType)

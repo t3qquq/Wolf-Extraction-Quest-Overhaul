@@ -468,9 +468,9 @@ WQS.ComposeExtractionStatsTxt = function(playerObj)
                 stats_raw.CardinalDir)
     end
 
-    local pz = string.format("%.0f", playerObj:getZ())
-    local tz = string.format("%.0f", stats_raw.Zlevel_val)
-    local sr = tostring(pz) .. "/" .. tostring(tz)
+    -- Same floor numbering as the repeater list, otherwise the two panels of the
+    -- same window would disagree about what "the fifth floor" is called.
+    local sr = WQS_Shared.FloorPairTxt(playerObj:getZ(), stats_raw.Zlevel_val)
 
     if stats_raw.Zlevel_isok then
         --stats.ZlevelLabel = stats.ZlevelLabel .. tostring(sr) .. " OK! "
