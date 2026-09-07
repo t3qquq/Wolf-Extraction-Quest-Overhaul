@@ -169,6 +169,18 @@ end
 
 WQS_MPSession.GetGroupMode = GetGroupMode
 
+---Sandbox death rule. 1 = run lockout only, 2 = also kicked from the group,
+---3 = also put into spectator mode. Read at use time like the group mode.
+local DEATH_RULE_LOCKOUT = 1
+local DEATH_RULE_KICK = 2
+local DEATH_RULE_SPECTATE = 3
+
+local function GetDeathRule()
+    return SandboxVars.WQS_ExtractionDeathRule_opt
+end
+
+WQS_MPSession.GetDeathRule = GetDeathRule
+
 ---Safehouse a player belongs to, as owner or as member.
 ---SafeHouse.hasSafehouse already checks both lists, and returns the first
 ---match when the server allows owning several.
@@ -432,6 +444,8 @@ local function SyncRoster(factionKey, sess)
     sess.Ready = PruneByRoster(sess.Ready, inRoster)
     sess.Arrived = PruneByRoster(sess.Arrived, inRoster)
     sess.Dead = PruneByRoster(sess.Dead, inRoster)
+    sess.RunLocked = PruneByRoster(sess.RunLocked, inRoster)
+    sess.RunLockNoted = PruneByRoster(sess.RunLockNoted, inRoster)
     sess.Extracted = PruneByRoster(sess.Extracted, inRoster)
 
     print("WQS_MP roster resynced faction=" .. factionKey .. " members=" .. #fresh)
@@ -748,6 +762,9 @@ local function NewSession(factionKey)
         State = ST_PRE,
         Roster = GetFactionRoster(factionKey),
         Dead = {},
+        -- died after the run started: excluded for the rest of this session
+        RunLocked = {},
+        RunLockNoted = {},
         Ready = {},
         Arrived = {},
         Extracted = {},
@@ -763,6 +780,22 @@ local function NewSession(factionKey)
     return sess
 end
 
+--- Sessions live in ModData across restarts, so one saved by an older build is
+--- missing any field added since. Fill those in on the way out instead of
+--- guarding every read site.
+local function MigrateSession(sess)
+    if not sess then
+        return nil
+    end
+    if not sess.RunLocked then
+        sess.RunLocked = {}
+    end
+    if not sess.RunLockNoted then
+        sess.RunLockNoted = {}
+    end
+    return sess
+end
+
 function WQS_MPSession.GetSession(factionKey, createIfMissing)
     if not factionKey then
         return nil
@@ -773,7 +806,7 @@ function WQS_MPSession.GetSession(factionKey, createIfMissing)
         sess = NewSession(factionKey)
         store.Sessions[factionKey] = sess
     end
-    return sess
+    return MigrateSession(sess)
 end
 
 --- Full wipe. Used when the whole faction is dead (the run failed, repeater
@@ -1173,25 +1206,135 @@ local function IsWipe(sess)
     return true
 end
 
+--- Extra punishment on top of the run lockout, per sandbox option.
+---
+--- Both of the heavier rules have to run on the dying player's own client.
+--- Faction/SafeHouse only broadcast their member lists from GameClient
+--- (Faction.java does not even import GameServer), so a removePlayer() called
+--- here would change server memory and never reach anyone. Spectator mode is
+--- client state by nature. So the server decides and the client executes.
+---
+--- The kick needs the owner handled separately: vanilla hides "quit faction"
+--- for the owner because a faction cannot be left ownerless. The client is
+--- told who to hand ownership to, picked here from the living members.
+---Roster members other than the given one that are not dead. Offline members
+---count: they are still group members, they just are not in the run right now.
+local function CountLivingMembers(sess, exceptUser)
+    local n = 0
+    for i = 1, #sess.Roster do
+        local u = sess.Roster[i]
+        if u ~= exceptUser and not sess.Dead[u] then
+            n = n + 1
+        end
+    end
+    return n
+end
+
+local function PickSuccessor(sess, deadUser, onlineMap)
+    for i = 1, #sess.Roster do
+        local u = sess.Roster[i]
+        if u ~= deadUser and not sess.Dead[u] and onlineMap[u] then
+            return u
+        end
+    end
+    return nil
+end
+
+local function ApplyDeathRule(factionKey, sess, username, player)
+    local rule = GetDeathRule()
+    if rule == DEATH_RULE_LOCKOUT then
+        return
+    end
+
+    if rule == DEATH_RULE_SPECTATE then
+        SendTo(player, "EnterSpectate", {})
+        print("WQS_MP death rule applied faction=" .. factionKey ..
+            " user=" .. username .. " rule=3 action=spectate")
+        return
+    end
+
+    if rule == DEATH_RULE_KICK then
+        local mode = GetGroupMode()
+        -- Never empty a group. Factions and safehouses outlive a single run,
+        -- and safehouse access is commonly tied to faction membership, so the
+        -- last one standing keeps their seat no matter how they died.
+        if CountLivingMembers(sess, username) == 0 then
+            print("WQS_MP death rule: last member, kick skipped user=" ..
+                tostring(username))
+            return
+        end
+        if mode == 1 then
+            -- no group to leave: the personal session is the whole run
+            DestroySession(factionKey, "death rule")
+            print("WQS_MP death rule applied faction=" .. factionKey ..
+                " user=" .. username .. " rule=2 action=session-destroy")
+            return
+        end
+
+        local successor = PickSuccessor(sess, username, GetOnlineMap())
+        SendTo(player, "LeaveGroup", { mode = mode, successor = successor })
+        print("WQS_MP death rule applied faction=" .. factionKey ..
+            " user=" .. username .. " rule=2 action=group-kick successor=" ..
+            tostring(successor))
+    end
+end
+
 --- Safety net for deaths the client never reported (crash right on death), and
---- the way back in: the exclusion belongs to the dead character, not to the
---- account, so a player who respawns rejoins the run. Without the second half
---- a single death locked that player out of every gate until the whole faction
---- wiped.
+--- the way back in.
+---
+--- B41 MP has no resurrection: dying always produces a brand new character.
+--- The old code only asked isDead(), so the replacement character read as
+--- "alive again" and was let straight back into the run it never took part in.
+--- Measured consequences: the new character inherited a latched completion
+--- gate and could extract, the completion gate re-locked and froze the timer
+--- for everyone else, and zombies started spawning around the respawn point.
+---
+--- So a death that happens once the run is under way is final for that run
+--- (RunLocked). Before the run starts there is nothing to inherit, so the
+--- respawn is let back in as before and the member can request normally.
 local function ReconcileDeaths(factionKey, sess, onlineMap)
     local changed = false
+    local runUnderWay = (sess.State == ST_RUNNING) or (sess.State == ST_UNLOCKED) or
+        (sess.State == ST_DONE)
+
     for i = 1, #sess.Roster do
         local u = sess.Roster[i]
         local p = onlineMap[u]
         if p then
             if p:isDead() then
                 if MarkDead(factionKey, sess, u, "reconcile-isDead") then
+                    if runUnderWay then
+                        sess.RunLocked[u] = true
+                        print("WQS_MP member locked out of run faction=" .. factionKey ..
+                            " user=" .. u .. " state=" .. tostring(sess.State))
+                        -- MarkDead already set Dead[u], so IsWipe here sees the
+                        -- final state. A death that wipes the run gets no extra
+                        -- punishment: the run is already lost, and kicking the
+                        -- last member would leave an empty faction behind (with
+                        -- whatever safehouse hangs off it).
+                        if IsWipe(sess) then
+                            print("WQS_MP death rule skipped, wipe faction=" ..
+                                factionKey .. " user=" .. u)
+                        else
+                            ApplyDeathRule(factionKey, sess, u, p)
+                        end
+                    end
                     changed = true
                 end
             elseif sess.Dead[u] then
-                sess.Dead[u] = nil
-                print("WQS_MP member rejoined after respawn faction=" .. factionKey .. " user=" .. u)
-                changed = true
+                if sess.RunLocked[u] then
+                    -- respawned, but as a different character: stays out
+                    if not sess.RunLockNoted[u] then
+                        sess.RunLockNoted[u] = true
+                        print("WQS_MP respawn ignored, locked out of run faction=" ..
+                            factionKey .. " user=" .. u)
+                        changed = true
+                    end
+                else
+                    sess.Dead[u] = nil
+                    print("WQS_MP member rejoined after respawn faction=" .. factionKey .. " user=" .. u)
+                    changed = true
+                end
             end
         end
     end
@@ -1211,6 +1354,7 @@ local function PollSessions()
         -- pairs() iterates a snapshot of the keys (KahluaTableImpl), so a key
         -- removed during the loop still comes back with a nil value
         if sess then
+            MigrateSession(sess)
             local changed = false
             local gone = anyoneOnline and IsGroupGone(factionKey)
 
@@ -1368,10 +1512,12 @@ Handlers["Join"] = function(sess, factionKey, player, args)
             " state=" .. tostring(sess.State) .. " targets=" .. #sess.Targets ..
             " active=" .. tostring(WQS_MPSession.CountActive(sess)))
     end
-    -- a rejoining member is restored unless their character is currently dead
+    -- a rejoining member is restored unless their character is currently dead,
+    -- or died after the run started (see ReconcileDeaths: that death is final
+    -- for the run, and reconnecting must not wash it out)
     if player:isDead() then
         MarkDead(factionKey, sess, u, "join-isDead")
-    elseif sess.Dead[u] then
+    elseif sess.Dead[u] and not sess.RunLocked[u] then
         sess.Dead[u] = nil
         print("WQS_MP member rejoined after respawn faction=" .. factionKey .. " user=" .. u)
     end

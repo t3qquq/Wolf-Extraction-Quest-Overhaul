@@ -70,6 +70,19 @@ option WQS_GroupMode_opt
 	valueTranslation = WQS_GroupMode_optlist,
 }
 
+option WQS_ExtractionDeathRule_opt
+{
+	type = enum,numValues = 3,default = 1,
+	page = WQS, translation = WQS_ExtractionDeathRule_txt,
+	valueTranslation = WQS_ExtractionDeathRule_optlist,
+}
+
+option WQS_SpectateNoClip_opt
+{
+	type = boolean, default = false,
+	page = WQS, translation = WQS_SpectateNoClip_txt,
+}
+
 option WQS_DebugLog_opt
 {
 	type = boolean, default = false,
