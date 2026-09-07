@@ -254,6 +254,18 @@ local function WQS_GPSWindowUpdate()
 			WQS_GPSWindow.ReqExtrBut:setVisible(true)
 			--WQS.SetState("EXTRACTION_CAN_BE_STARTED")
 			CurrentStateLabel = getText("IGUI_WQS_StatusExtraction2") or "Extraction can be requestedz"
+
+			-- MP: somebody else already requested but we did not. Without this
+			-- the other members get no hint at all that the gate is half open,
+			-- so show the same roster and counter the requester sees. The
+			-- button keeps its normal title because clicking it still means
+			-- "request", not "cancel".
+			if WQS_Session.GetReadyCount() > 0 then
+				local waitLbl = getText("IGUI_WQS_MP_WaitingRequest") or "Waiting for extraction request"
+				CurrentStateLabel = CurrentStateLabel .. " <LINE> " .. waitLbl ..
+					" (" .. WQS_Session.GetReadyCount() .. "/" .. WQS_Session.GetReadyTotal() .. ")"
+				RosterTxt = WQS_Session.GetMemberRosterTxt(false)
+			end
 		end
 
 		-- MP: request gate. The button stays clickable so a member can undo

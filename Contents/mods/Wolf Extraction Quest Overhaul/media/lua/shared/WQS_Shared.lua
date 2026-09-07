@@ -74,6 +74,13 @@ WQS_COLGREEN = " <RGB:0.4,0.9,0> "
 WQS_COLGREEN = " <RGB:0,0.8,0> "
 --WQS_COLGREEN = " <RGB:0.39,0.85,0.20> "
 WQS_COLRED = " <RGB:1,0,0> "
+
+-- Roster status column, in pixels from the left edge of the rich text panel.
+-- MIN keeps short names from putting the status right against the name; MAX
+-- stops a very long name from pushing the status word out of the panel.
+WQS_ROSTER_MIN_COL = 90
+WQS_ROSTER_MAX_COL = 150
+WQS_ROSTER_COL_GAP = 14
 --WQS_COLSUBTIT2 = " <RGB:1,1,0> " --giallo
 --WQS_COLSUBTIT2 = " <RGB:0,1,1> " --cyano
 --WQS_COLSUBTIT2 = " <RGB:0.5,1,0.83> " --acquamarina
@@ -395,20 +402,57 @@ WQS_Session.GetMemberRosterTxt = function(useArrived)
     if not d or not d.members or #d.members == 0 then
         return ""
     end
+    -- Two aligned columns: name on the left, status at a fixed x so the
+    -- status words line up no matter how long the names are. ISRichTextPanel
+    -- understands <SETX:pixels>, which is the only way to get a real column
+    -- here: the UI font is proportional, so padding with spaces never aligns.
+    -- The column is measured from the widest name in the roster and clamped,
+    -- because a very long name would otherwise push the status off the panel.
+    local statusX = WQS_ROSTER_MIN_COL
+    local tm = getTextManager and getTextManager()
+    if tm then
+        for i = 1, #d.members do
+            local w = tm:MeasureStringX(UIFont.NewSmall, d.members[i].u)
+            if w + WQS_ROSTER_COL_GAP > statusX then
+                statusX = w + WQS_ROSTER_COL_GAP
+            end
+        end
+        if statusX > WQS_ROSTER_MAX_COL then
+            statusX = WQS_ROSTER_MAX_COL
+        end
+    end
+
     local ret = ""
     for i = 1, #d.members do
         local m = d.members[i]
         local ok = false
+        local okLbl = nil
+        local waitLbl = nil
         if useArrived then
             ok = m.arrived
+            okLbl = getText("IGUI_WQS_MP_RosterArrived")
+            waitLbl = getText("IGUI_WQS_MP_RosterMoving")
         else
             ok = m.ready
+            okLbl = getText("IGUI_WQS_MP_RosterReady")
+            waitLbl = getText("IGUI_WQS_MP_RosterNotReady")
         end
+
+        -- one member per line. The roster is drawn inside a rich text panel,
+        -- so the separator has to be a <LINE> tag with a space on both sides;
+        -- plain spaces put every name on a single unreadable row.
+        if i > 1 then
+            ret = ret .. " <LINE> <LEFT> "
+        end
+
+        local col = WQS_COLRED
+        local lbl = waitLbl
         if ok then
-            ret = ret .. WQS_COLGREEN .. m.u .. WQS_COLWHITE .. "  "
-        else
-            ret = ret .. WQS_COLRED .. m.u .. WQS_COLWHITE .. "  "
+            col = WQS_COLGREEN
+            lbl = okLbl
         end
+        ret = ret .. col .. m.u ..
+            " <SETX:" .. statusX .. "> " .. col .. lbl .. WQS_COLWHITE
     end
     return ret
 end
