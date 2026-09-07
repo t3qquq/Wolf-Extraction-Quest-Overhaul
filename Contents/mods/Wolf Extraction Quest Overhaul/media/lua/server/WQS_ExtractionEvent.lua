@@ -705,7 +705,8 @@ function WQS_OnClientCommand(WQS_module, WQS_command, WQS_player, WQS_args)
             -- overlapping helicopter cues. Positional, so members spread across
             -- the map still each get their own.
             if WQS_MPSession and not WQS_MPSession.ClaimSound(soundname, sq:getX(), sq:getY()) then
-                print("WQS sound suppressed, " .. soundname .. " already played nearby")
+                print("WQS sound suppressed, " .. soundname .. " already played nearby, by=" ..
+                    tostring(WQS_player and WQS_player:getUsername()))
                 return
             end
             playServerSound(soundname, sq)
