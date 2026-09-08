@@ -264,7 +264,7 @@ local function WQS_GPSWindowUpdate()
 				local waitLbl = getText("IGUI_WQS_MP_WaitingRequest") or "Waiting for extraction request"
 				CurrentStateLabel = CurrentStateLabel .. " <LINE> " .. waitLbl ..
 					" (" .. WQS_Session.GetReadyCount() .. "/" .. WQS_Session.GetReadyTotal() .. ")"
-				RosterTxt = WQS_Session.GetMemberRosterTxt(false)
+				RosterTxt = WQS_Session.GetMemberRosterTxt("ready")
 			end
 		end
 
@@ -276,19 +276,23 @@ local function WQS_GPSWindowUpdate()
 			WQS_GPSWindow.ReqExtrBut:setTitle(waitLbl ..
 				" (" .. WQS_Session.GetReadyCount() .. "/" .. WQS_Session.GetReadyTotal() .. ")")
 			CurrentStateLabel = waitLbl
-			RosterTxt = WQS_Session.GetMemberRosterTxt(false)
+			RosterTxt = WQS_Session.GetMemberRosterTxt("ready")
 		end
 
 		if (WQS.CurrentStateIs("EXTRACTION_RUNNING")) then
 			CurrentStateLabel = getText("IGUI_WQS_StatusExtraction3") or "Extraction in progress"
 			local land = getText("IGUI_WQS_StatusExtraction6") or "Expected arrival in"
 			CurrentStateLabel = CurrentStateLabel .. " <LINE> " .. land .. ": " .. WQS_EXTRACTION_TIME_LEFT .. " min "
+			-- MP: no gate is open during the run, so the roster answers the one
+			-- question that matters here instead: who is still alive. Losing a
+			-- member used to be invisible until the run ended short.
+			RosterTxt = WQS_Session.GetMemberRosterTxt("run")
 		end
 
 		if (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED_BUT_WRONG_ZONE")) then
 			CurrentStateLabel = getText("IGUI_WQS_StatusExtraction5") or
 				"Extraction can be completeted, go to extraction zone!"
-			RosterTxt = WQS_Session.GetMemberRosterTxt(true)
+			RosterTxt = WQS_Session.GetMemberRosterTxt("arrived")
 		end
 
 		-- MP: completion gate. This player is in the zone but the faction is
@@ -300,17 +304,21 @@ local function WQS_GPSWindowUpdate()
 			WQS_GPSWindow.CompleteExtrBut:setTitle(waitLbl ..
 				" (" .. WQS_Session.GetArrivedCount() .. "/" .. WQS_Session.GetArrivedTotal() .. ")")
 			CurrentStateLabel = waitLbl
-			RosterTxt = WQS_Session.GetMemberRosterTxt(true)
+			RosterTxt = WQS_Session.GetMemberRosterTxt("arrived")
 		end
 
 		if (WQS.CurrentStateIs("EXTRACTION_CAN_BE_COMPLETED")) then
 			CurrentStateLabel = getText("IGUI_WQS_StatusExtraction4") or "Extraction can be completetedz"
 			WQS_GPSWindow.CompleteExtrBut:setVisible(true)
+			RosterTxt = WQS_Session.GetMemberRosterTxt("arrived")
 		end
 
 
 		if (WQS.CurrentStateIs("EXTRACTION_COMPLETED")) then
 			CurrentStateLabel = getText("IGUI_WQS_StatusExtraction9") or "Extraction completetedz"
+			-- this player is out but the run is not over: the roster is the
+			-- only thing left telling them how the rest of the team is doing
+			RosterTxt = WQS_Session.GetMemberRosterTxt("arrived")
 		end
 
 		-- MP: the whole faction confirmed the ending, the session is closing

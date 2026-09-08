@@ -74,6 +74,9 @@ WQS_COLGREEN = " <RGB:0.4,0.9,0> "
 WQS_COLGREEN = " <RGB:0,0.8,0> "
 --WQS_COLGREEN = " <RGB:0.39,0.85,0.20> "
 WQS_COLRED = " <RGB:1,0,0> "
+-- roster only: a member who already left the map. Deliberately not green and
+-- not red, because "extracted" is neither a pending condition nor a failure.
+WQS_COLCYAN = " <RGB:0.4,0.8,1> "
 
 -- Roster status column, in pixels from the left edge of the rich text panel.
 -- MIN keeps short names from putting the status right against the name; MAX
@@ -335,13 +338,21 @@ end
 --- True only while this player is a live participant of a running session.
 --- The extraction event loop (zombie spawning) is gated on this: a dead or
 --- already extracted member must not keep spawning for the rest of the team.
+---
+--- The m.dead check is load bearing and must not be removed. The snapshot used
+--- to drop dead members from the member list entirely, so the nil check below
+--- was the whole spawn gate for a death. The run roster needs those members to
+--- stay in the list, so the gate has to be explicit now.
 WQS_Session.IsSelfParticipating = function()
     if not WQS_Session.IsRunning() and not WQS_Session.IsUnlocked() then
         return false
     end
     local m = WQS_Session.GetSelfMember()
     if not m then
-        return false -- dead or dropped from the effective roster
+        return false -- offline, or dropped from the roster
+    end
+    if m.dead then
+        return false
     end
     if m.extracted then
         return false
@@ -395,9 +406,51 @@ WQS_Session.GetExtractionMap = function()
     return d.map
 end
 
+--- Status word and colour for one roster row.
+---
+--- Death and extraction outrank whatever gate is open: a member who died is
+--- not "still moving" and one who already left is not "not ready". Keeping the
+--- priority here rather than per mode is what makes the three rosters agree
+--- with each other, and it is what puts the run outcome on screen while the
+--- arrival gate is still counting.
+local function RosterStatus(m, mode)
+    if m.dead then
+        return WQS_COLRED, getText("IGUI_WQS_MP_RosterDead")
+    end
+    if m.extracted then
+        return WQS_COLCYAN, getText("IGUI_WQS_MP_RosterExtracted")
+    end
+    if mode == "run" then
+        return WQS_COLGREEN, getText("IGUI_WQS_MP_RosterAlive")
+    end
+    if mode == "arrived" then
+        if m.arrived then
+            return WQS_COLGREEN, getText("IGUI_WQS_MP_RosterArrived")
+        end
+        return WQS_COLRED, getText("IGUI_WQS_MP_RosterMoving")
+    end
+    if m.ready then
+        return WQS_COLGREEN, getText("IGUI_WQS_MP_RosterReady")
+    end
+    return WQS_COLRED, getText("IGUI_WQS_MP_RosterNotReady")
+end
+
 --- Roster line for the tracker: green = condition met, red = still missing.
---- Which condition is coloured depends on the gate currently open.
-WQS_Session.GetMemberRosterTxt = function(useArrived)
+---
+--- mode picks what the right hand column means:
+---   "ready"   request gate    - 준비 완료 / 준비 중
+---   "arrived" arrival gate    - 도착 / 이동 중
+---   "run"     run in progress - 생존
+--- In every one of them a dead or extracted member gets their own word
+--- instead; see RosterStatus.
+WQS_Session.GetMemberRosterTxt = function(mode)
+    -- the parameter used to be a boolean useArrived
+    if mode == true then
+        mode = "arrived"
+    elseif mode == false or mode == nil then
+        mode = "ready"
+    end
+
     local d = WQS_Session.Data
     if not d or not d.members or #d.members == 0 then
         return ""
@@ -425,18 +478,7 @@ WQS_Session.GetMemberRosterTxt = function(useArrived)
     local ret = ""
     for i = 1, #d.members do
         local m = d.members[i]
-        local ok = false
-        local okLbl = nil
-        local waitLbl = nil
-        if useArrived then
-            ok = m.arrived
-            okLbl = getText("IGUI_WQS_MP_RosterArrived")
-            waitLbl = getText("IGUI_WQS_MP_RosterMoving")
-        else
-            ok = m.ready
-            okLbl = getText("IGUI_WQS_MP_RosterReady")
-            waitLbl = getText("IGUI_WQS_MP_RosterNotReady")
-        end
+        local col, lbl = RosterStatus(m, mode)
 
         -- one member per line. The roster is drawn inside a rich text panel,
         -- so the separator has to be a <LINE> tag with a space on both sides;
@@ -445,12 +487,6 @@ WQS_Session.GetMemberRosterTxt = function(useArrived)
             ret = ret .. " <LINE> <LEFT> "
         end
 
-        local col = WQS_COLRED
-        local lbl = waitLbl
-        if ok then
-            col = WQS_COLGREEN
-            lbl = okLbl
-        end
         ret = ret .. col .. m.u ..
             " <SETX:" .. statusX .. "> " .. col .. lbl .. WQS_COLWHITE
     end

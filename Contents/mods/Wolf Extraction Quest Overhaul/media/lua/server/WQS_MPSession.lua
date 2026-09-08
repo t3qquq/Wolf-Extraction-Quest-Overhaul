@@ -951,25 +951,46 @@ end
 local function BuildSnapshot(factionKey, sess, onlineMap)
     local eff = GetEffectiveRoster(sess, onlineMap)
 
-    local members = {}
+    -- Gate counters stay on the effective roster. A dead member must never
+    -- hold the request or arrival gate open, and EvaluateDoneGate reads the
+    -- same roster, so nothing below may widen these.
     local readyCount = 0
     local arrivedCount = 0
     for i = 1, #eff do
         local u = eff[i]
-        local isReady = sess.Ready[u] and true or false
-        local isArrived = sess.Arrived[u] and true or false
-        if isReady then
+        if sess.Ready[u] then
             readyCount = readyCount + 1
         end
-        if isArrived then
+        if sess.Arrived[u] then
             arrivedCount = arrivedCount + 1
         end
-        table.insert(members, {
-            u = u,
-            ready = isReady,
-            arrived = isArrived,
-            extracted = sess.Extracted[u] and true or false,
-        })
+    end
+
+    -- The member list is deliberately wider than the effective roster: the
+    -- tracker has to keep showing a member after they die, and that is exactly
+    -- what GetEffectiveRoster filters out. Offline members stay out, so three
+    -- states cover every row the client can draw: alive, dead, extracted.
+    -- Extraction does not disconnect anyone (Handlers["Extracted"] only sets a
+    -- flag), so an extracted member is still online and still has a row.
+    local members = {}
+    for i = 1, #sess.Roster do
+        local u = sess.Roster[i]
+        if onlineMap[u] then
+            local isDead = sess.Dead[u] and true or false
+            table.insert(members, {
+                u = u,
+                -- MarkDead already clears both flags; restating it here keeps
+                -- a stale flag from ever colouring a dead row green.
+                ready = (not isDead) and (sess.Ready[u] and true or false),
+                arrived = (not isDead) and (sess.Arrived[u] and true or false),
+                extracted = sess.Extracted[u] and true or false,
+                dead = isDead,
+                -- locked = death was final for this run (post-start death).
+                -- Unused by the tracker today; the death rule values 2 and 3
+                -- will need to tell "excluded" from "dead, respawning".
+                locked = sess.RunLocked[u] and true or false,
+            })
+        end
     end
 
     local targets = {}
