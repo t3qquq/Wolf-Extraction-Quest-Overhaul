@@ -326,6 +326,16 @@ local function WQS_GPSWindowUpdate()
 			CurrentStateLabel = getText("IGUI_WQS_MP_RunFinished")
 		end
 
+		-- MP: a member the run has released (dead, or already extracted) must
+		-- not be offered the extract button. The client state can still land
+		-- on CAN_BE_COMPLETED for them because it is computed from the session
+		-- state, not from their own row, so this runs after every branch above
+		-- rather than inside one of them. The server rejects the command too;
+		-- this only keeps a dead player from looking like they can finish.
+		if not WQS_Session.CanSelfExtract() then
+			WQS_GPSWindow.CompleteExtrBut:setVisible(false)
+		end
+
 		--i tag devono avere prima e dopo uno spazio!
 		local GuiTxt = ""
 

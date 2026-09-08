@@ -360,6 +360,27 @@ WQS_Session.IsSelfParticipating = function()
     return true
 end
 
+--- Whether the extract button should be offered to this player at all.
+--- Separate from IsSelfParticipating on purpose: that one is the spawn gate,
+--- is state gated on RUNNING/UNLOCKED and returns false when there is no
+--- member row, which in SP or on a rosterless snapshot would hide the button
+--- from a legitimate player. This one fails open - the server rejects the
+--- command anyway - and only hides the button from a member the run has
+--- already released.
+WQS_Session.CanSelfExtract = function()
+    local m = WQS_Session.GetSelfMember()
+    if not m then
+        return true
+    end
+    if m.dead then
+        return false
+    end
+    if m.extracted then
+        return false
+    end
+    return true
+end
+
 WQS_Session.GetReadyCount = function()
     local d = WQS_Session.Data
     if not d then return 0 end

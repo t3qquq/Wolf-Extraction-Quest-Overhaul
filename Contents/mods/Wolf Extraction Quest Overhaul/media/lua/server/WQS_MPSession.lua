@@ -1762,11 +1762,21 @@ Handlers["ReportDeath"] = function(sess, factionKey, player, args)
 end
 
 --- Player confirmed the end modal and is leaving.
+--- The completion gate only ever looked at the effective roster, so a dead
+--- member never held the run open. Nothing checked the command itself though:
+--- the tracker of a locked out member kept the extract button up, and clicking
+--- it credited a dead character with a successful extraction. The gate belongs
+--- here and not in the UI because the client is not the authority.
 Handlers["Extracted"] = function(sess, factionKey, player, args)
     if sess.State ~= ST_UNLOCKED and sess.State ~= ST_DONE then
         return false
     end
     local u = GetUserKey(player)
+    if sess.Dead[u] or sess.RunLocked[u] then
+        print("WQS_MP extract rejected, locked out of run faction=" .. factionKey ..
+            " user=" .. u)
+        return false
+    end
     sess.Extracted[u] = true
     print("WQS_MP extracted faction=" .. factionKey .. " user=" .. u)
     return true
