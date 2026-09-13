@@ -427,6 +427,40 @@ WQS_Session.GetExtractionMap = function()
     return d.map
 end
 
+--- The MapItems the server said it accepts for SetExtractionMap.
+---
+--- Map mods register their extraction zones from OnGameStart, which a
+--- dedicated server never fires, so this client can hold zones the server has
+--- never heard of. Only the server knows which ones they are, so it ships the
+--- list and the headquarters menu draws the intersection.
+WQS_Session.GetKnownZones = function()
+    local d = WQS_Session.Data
+    if not d then return nil end
+    return d.zones
+end
+
+--- True if the server will accept this zone.
+---
+--- Fails open on purpose: no snapshot yet, or a snapshot from a build that
+--- does not send the list, must not empty the menu. A wrong "yes" costs one
+--- rejected command; a wrong "no" hides every zone with nothing on screen to
+--- explain it.
+WQS_Session.IsZoneKnownToServer = function(mapItem)
+    if not mapItem then
+        return false
+    end
+    local z = WQS_Session.GetKnownZones()
+    if not z or #z == 0 then
+        return true
+    end
+    for i = 1, #z do
+        if z[i] == mapItem then
+            return true
+        end
+    end
+    return false
+end
+
 --- Status word and colour for one roster row.
 ---
 --- Death and extraction outrank whatever gate is open: a member who died is

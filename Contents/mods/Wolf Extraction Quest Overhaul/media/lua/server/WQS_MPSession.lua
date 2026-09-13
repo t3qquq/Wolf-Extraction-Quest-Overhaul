@@ -575,6 +575,37 @@ local function IsKnownExtractionMap(item)
     return false
 end
 
+--- Every MapItem this server is willing to accept, for the snapshot.
+---
+--- Map mods register their extraction zones from OnGameStart, an event a
+--- dedicated server never fires, so the client can end up holding zones the
+--- server has never heard of. They were drawn in the headquarters list like
+--- any other and every pick came back as "SetExtractionMap rejected, unknown
+--- zone", with nothing on screen to say why. The client cannot decide this on
+--- its own because the gap is precisely that the two sides disagree, so the
+--- authority ships its own list and the UI draws the intersection.
+---
+--- WQS_ExtractionPointsData does not change after boot, hence the cache. It is
+--- only filled in once the extraction data is set up, so an empty result is
+--- not cached: caching it would blank the list for the whole session.
+local KnownExtractionMapsCache = nil
+
+local function GetKnownExtractionMaps()
+    if KnownExtractionMapsCache then
+        return KnownExtractionMapsCache
+    end
+    local out = {}
+    for k, v in pairs(WQS_ExtractionPointsData) do
+        if v and v.MapItem and v.MapItem ~= "" and v.MapCenterAreaX and v.MapCenterAreaX > 0 then
+            table.insert(out, v.MapItem)
+        end
+    end
+    if #out > 0 then
+        KnownExtractionMapsCache = out
+    end
+    return out
+end
+
 -- ##############################################################
 -- repeater targets
 -- ##############################################################
@@ -1030,6 +1061,10 @@ local function BuildSnapshot(factionKey, sess, onlineMap)
         targets = targets,
         maxTargets = GetMaxRepeaters(),
         activeCount = WQS_MPSession.CountActive(sess),
+        -- The zones SetExtractionMap will accept. The headquarters list is
+        -- built from the client side table, which on a dedicated server holds
+        -- more than this one does; see GetKnownExtractionMaps.
+        zones = GetKnownExtractionMaps(),
     }
 end
 

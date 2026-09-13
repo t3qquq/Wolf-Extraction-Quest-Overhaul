@@ -133,12 +133,38 @@ function WQS_AntennaGui:onClickMainActionBut()
         WQS.SetQuestAsStarted()
         self:close();
         local ln = " <LINE> "
-        -- the confirmed zone arrives with the next snapshot, so the modal shows
-        -- the label only when it is already known
-        local cmap = WQS.getExtractionData(WQS.getCurretExtractionMap())
-        local MapLabel = ""
-        if (cmap) and (cmap.MapGuiLabel) then
-            MapLabel = WQS_Shared.GetZoneLabel(cmap.MapGuiLabel)
+        -- getCurretExtractionMap is the session value and the new zone only
+        -- arrives with the next snapshot, so reading it here always printed
+        -- the zone that was just replaced. The new label is built from the
+        -- selection instead, and the old one is kept next to it: "changed to
+        -- X" says nothing when you cannot see what X replaced.
+        local oldMap = WQS.getExtractionData(WQS.getCurretExtractionMap())
+        local OldLabel = ""
+        if (oldMap) and (oldMap.MapGuiLabel) then
+            OldLabel = WQS_Shared.GetZoneLabel(oldMap.MapGuiLabel)
+        end
+
+        local NewLabel = ""
+        if selData.MapItem == "random" then
+            -- the server rolls the zone, so the pool name is all the client
+            -- can honestly show until the snapshot lands
+            if selData.RandomZoneOpt == "random_only_louisville" then
+                NewLabel = getText("IGUI_WQS_RandomOpt2")
+            elseif selData.RandomZoneOpt == "random_excluding_louisville" then
+                NewLabel = getText("IGUI_WQS_RandomOpt3")
+            else
+                NewLabel = getText("IGUI_WQS_RandomOpt1")
+            end
+        else
+            local newMap = WQS.getExtractionData(selData.MapItem)
+            if (newMap) and (newMap.MapGuiLabel) then
+                NewLabel = WQS_Shared.GetZoneLabel(newMap.MapGuiLabel)
+            end
+        end
+
+        local MapLabel = NewLabel
+        if (OldLabel ~= "") and (NewLabel ~= "") then
+            MapLabel = OldLabel .. " -> " .. NewLabel
         end
         local NewExtrDone = getText("IGUI_WQS_ReqNewExtractionPointDone") .. ln .. MapLabel .. ln
         local MapCraftInfo = getText("IGUI_WQS_ExtractionMapCraftInfo")
@@ -351,7 +377,14 @@ function WQS_AntennaGui:populateInfoList(_name)
             local mapItemId = WQS_ExtractionPointsData[k].MapItem
             local mapX = WQS_ExtractionPointsData[k].MapCenterAreaX
             --print(mapLabel,mapItemId,mapX)
-            if ((mapLabel) and (mapItemId) and not (mapX == 0)) then
+            -- Map mods register their zones from OnGameStart, an event a
+            -- dedicated server never fires, so this table can hold zones the
+            -- server does not have. They were drawn here like any other and
+            -- every pick came back as "SetExtractionMap rejected, unknown
+            -- zone" with nothing on screen to say why. The snapshot carries
+            -- the list the server accepts; anything outside it is dropped.
+            if ((mapLabel) and (mapItemId) and not (mapX == 0) and
+                    WQS_Session.IsZoneKnownToServer(mapItemId)) then
                 if WQS_Shared.IsModdedMap(mapItemId) then
                     mapLabel = mapLabel .. " (M)"
                 end
