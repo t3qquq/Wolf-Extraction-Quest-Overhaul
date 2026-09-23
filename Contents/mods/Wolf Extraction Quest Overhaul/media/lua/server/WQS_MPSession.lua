@@ -1568,12 +1568,18 @@ Handlers["Join"] = function(sess, factionKey, player, args)
             " state=" .. tostring(sess.State) .. " targets=" .. #sess.Targets ..
             " active=" .. tostring(WQS_MPSession.CountActive(sess)))
     end
-    -- a rejoining member is restored unless their character is currently dead,
-    -- or died after the run started (see ReconcileDeaths: that death is final
-    -- for the run, and reconnecting must not wash it out)
+    -- Deaths belong to ReconcileDeaths alone. A dead client keeps sending Join
+    -- (OnPlayerUpdate still fires while the local player lies dead, B41
+    -- IsoPlayer.java:1730), and marking the death here could beat the poll to
+    -- it: the poll then found the flag already set, skipped RunLocked and the
+    -- death rule, and the respawn walked straight back into the run.
     if player:isDead() then
-        MarkDead(factionKey, sess, u, "join-isDead")
-    elseif sess.Dead[u] and not sess.RunLocked[u] then
+        return true
+    end
+    -- a respawned member is restored unless the death happened after the run
+    -- started (see ReconcileDeaths: that death is final for the run, and
+    -- reconnecting must not wash it out)
+    if sess.Dead[u] and not sess.RunLocked[u] then
         sess.Dead[u] = nil
         print("WQS_MP member rejoined after respawn faction=" .. factionKey .. " user=" .. u)
     end
