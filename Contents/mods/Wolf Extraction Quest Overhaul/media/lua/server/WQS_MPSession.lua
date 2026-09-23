@@ -385,14 +385,34 @@ local function HasOnline(onlineMap)
     return false
 end
 
---- Effective roster = current roster - dead - offline.
+local function IsRunUnderWay(sess)
+    return (sess.State == ST_RUNNING) or (sess.State == ST_UNLOCKED) or (sess.State == ST_DONE)
+end
+
+--- Whether u is part of the run under way. Outside a run everyone counts,
+--- the request gate is open to the whole roster.
+--- Participants is fixed when the request gate is satisfied. A member who was
+--- offline at that moment, or dead and has respawned since, is not in it: they
+--- stay out of every gate, the confined timer, spawning and extraction until
+--- they walk into the zone (AdmitLateJoiners). Without this a member logging
+--- in mid run was counted at once, froze the confined timer for everybody
+--- from wherever they logged in and held the completion gate open.
+local function IsParticipant(sess, u)
+    if not IsRunUnderWay(sess) then
+        return true
+    end
+    return sess.Participants[u] == true
+end
+
+--- Effective roster = current roster - dead - offline - not in this run.
 --- Dead is cleared again on respawn (see ReconcileDeaths), offline is
---- temporary (rejoin restores membership).
+--- temporary (rejoin restores membership), a late joiner is admitted once in
+--- the zone.
 local function GetEffectiveRoster(sess, onlineMap)
     local out = {}
     for i = 1, #sess.Roster do
         local u = sess.Roster[i]
-        if not sess.Dead[u] and onlineMap[u] then
+        if not sess.Dead[u] and onlineMap[u] and IsParticipant(sess, u) then
             table.insert(out, u)
         end
     end
@@ -447,6 +467,7 @@ local function SyncRoster(factionKey, sess)
     sess.RunLocked = PruneByRoster(sess.RunLocked, inRoster)
     sess.RunLockNoted = PruneByRoster(sess.RunLockNoted, inRoster)
     sess.Extracted = PruneByRoster(sess.Extracted, inRoster)
+    sess.Participants = PruneByRoster(sess.Participants, inRoster)
 
     print("WQS_MP roster resynced faction=" .. factionKey .. " members=" .. #fresh)
     return true
@@ -796,6 +817,8 @@ local function NewSession(factionKey)
         -- died after the run started: excluded for the rest of this session
         RunLocked = {},
         RunLockNoted = {},
+        -- members of the run under way, fixed at the request gate
+        Participants = {},
         Ready = {},
         Arrived = {},
         Extracted = {},
@@ -823,6 +846,22 @@ local function MigrateSession(sess)
     end
     if not sess.RunLockNoted then
         sess.RunLockNoted = {}
+    end
+    if not sess.Participants then
+        sess.Participants = {}
+        -- saved mid run by a build without the list: whoever was in the roster
+        -- and not locked out took part, which is what that build assumed
+        if IsRunUnderWay(sess) then
+            local n = 0
+            for i = 1, #sess.Roster do
+                local u = sess.Roster[i]
+                if not sess.RunLocked[u] then
+                    sess.Participants[u] = true
+                    n = n + 1
+                end
+            end
+            print("WQS_MP participants migrated state=" .. tostring(sess.State) .. " count=" .. n)
+        end
     end
     return sess
 end
@@ -964,6 +1003,9 @@ function WQS_MPSession.IsSpawnAllowed(player)
     if sess.Dead[u] or sess.Extracted[u] then
         return false
     end
+    if not sess.Participants[u] then
+        return false
+    end
     return true
 end
 
@@ -1003,10 +1045,17 @@ local function BuildSnapshot(factionKey, sess, onlineMap)
     -- states cover every row the client can draw: alive, dead, extracted.
     -- Extraction does not disconnect anyone (Handlers["Extracted"] only sets a
     -- flag), so an extracted member is still online and still has a row.
+    -- Late joiners are left out of the member list as well, so the tracker
+    -- keeps its three states. They are listed apart so their own client can
+    -- tell "waiting for the zone" from "no row", which CanSelfExtract reads
+    -- as fail open.
     local members = {}
+    local waiting = {}
     for i = 1, #sess.Roster do
         local u = sess.Roster[i]
-        if onlineMap[u] then
+        if onlineMap[u] and not IsParticipant(sess, u) then
+            table.insert(waiting, u)
+        elseif onlineMap[u] then
             local isDead = sess.Dead[u] and true or false
             table.insert(members, {
                 u = u,
@@ -1054,6 +1103,7 @@ local function BuildSnapshot(factionKey, sess, onlineMap)
         elapsed = sess.ElapsedMinutes,
         duration = WQS_MPSession.GetDurationMinutes(),
         members = members,
+        waiting = waiting,
         readyCount = readyCount,
         readyTotal = #eff,
         arrivedCount = arrivedCount,
@@ -1107,9 +1157,15 @@ local function EvaluateRequestGate(factionKey, sess, onlineMap)
         end
     end
 
+    sess.Participants = {}
+    for i = 1, #eff do
+        sess.Participants[eff[i]] = true
+    end
     sess.State = ST_RUNNING
     sess.ElapsedMinutes = 0
     sess.LastStampMinutes = getGameTime():getMinutesStamp()
+    -- identifies this run for the late joiner log latch
+    sess.RunStartedAt = sess.LastStampMinutes
     print("WQS_MP request gate satisfied faction=" .. factionKey .. " members=" .. #eff)
     return true
 end
@@ -1335,6 +1391,20 @@ local function ApplyDeathRule(factionKey, sess, username, player)
     end
 end
 
+--- Lets a respawned member back in after a death that did not lock them out.
+--- Once a run is under way that can only be someone who was not part of it
+--- (a participant's death sets RunLocked), so they come back as a late joiner
+--- waiting for the zone, never straight into the run.
+local function ReleaseRespawn(factionKey, sess, u)
+    sess.Dead[u] = nil
+    if IsParticipant(sess, u) then
+        print("WQS_MP member rejoined after respawn faction=" .. factionKey .. " user=" .. u)
+    else
+        print("WQS_MP respawn outside the run, waiting for the zone faction=" .. factionKey ..
+            " user=" .. u)
+    end
+end
+
 --- Safety net for deaths the client never reported (crash right on death), and
 --- the way back in.
 ---
@@ -1359,7 +1429,10 @@ local function ReconcileDeaths(factionKey, sess, onlineMap)
         if p then
             if p:isDead() then
                 if MarkDead(factionKey, sess, u, "reconcile-isDead") then
-                    if runUnderWay then
+                    -- only a death inside the run is final for it; a late
+                    -- joiner who dies before reaching the zone was never in
+                    -- it and just respawns as a late joiner again
+                    if runUnderWay and sess.Participants[u] then
                         sess.RunLocked[u] = true
                         print("WQS_MP member locked out of run faction=" .. factionKey ..
                             " user=" .. u .. " state=" .. tostring(sess.State))
@@ -1387,10 +1460,50 @@ local function ReconcileDeaths(factionKey, sess, onlineMap)
                         changed = true
                     end
                 else
-                    sess.Dead[u] = nil
-                    print("WQS_MP member rejoined after respawn faction=" .. factionKey .. " user=" .. u)
+                    ReleaseRespawn(factionKey, sess, u)
                     changed = true
                 end
+            end
+        end
+    end
+    return changed
+end
+
+--- Late joiner log latch, one line per member per run on entering the wait.
+--- Keyed faction|user, holds the run it was logged for (RunStartedAt), so the
+--- next run of the same group logs again. Cleared on admission.
+local LateJoinNoted = {}
+
+--- Admits the members who were not part of the run when it started (offline
+--- at the request gate, dead then, or in the group only since) once they stand
+--- in the zone. Same zone test as the completion gate. A member locked out by
+--- a death in this run is never admitted, and nobody is admitted after DONE:
+--- the run is over and there is nothing left to join.
+local function AdmitLateJoiners(factionKey, sess, onlineMap)
+    if (sess.State ~= ST_RUNNING) and (sess.State ~= ST_UNLOCKED) then
+        return false
+    end
+    local mapData = nil
+    local changed = false
+    for i = 1, #sess.Roster do
+        local u = sess.Roster[i]
+        local p = onlineMap[u]
+        if p and not sess.Participants[u] and not sess.Dead[u] and not sess.RunLocked[u] then
+            local noteKey = factionKey .. "|" .. u
+            local runId = tostring(sess.RunStartedAt)
+            if not mapData then
+                mapData = GetMapDataByItem(sess.ExtractionMap)
+            end
+            if IsPlayerInZone(p, mapData) then
+                sess.Participants[u] = true
+                LateJoinNoted[noteKey] = nil
+                print("WQS_MP late joiner admitted faction=" .. factionKey .. " user=" .. u ..
+                    " state=" .. tostring(sess.State))
+                changed = true
+            elseif LateJoinNoted[noteKey] ~= runId then
+                LateJoinNoted[noteKey] = runId
+                print("WQS_MP late joiner waiting for the zone faction=" .. factionKey .. " user=" .. u ..
+                    " state=" .. tostring(sess.State))
             end
         end
     end
@@ -1431,6 +1544,12 @@ local function PollSessions()
                         if EvaluateRequestGate(factionKey, sess, onlineMap) then
                             changed = true
                         end
+                    end
+
+                    -- before the timer and the gates, so an admission counts
+                    -- in this same tick
+                    if AdmitLateJoiners(factionKey, sess, onlineMap) then
+                        changed = true
                     end
 
                     if sess.State == ST_RUNNING or sess.State == ST_UNLOCKED then
@@ -1580,8 +1699,7 @@ Handlers["Join"] = function(sess, factionKey, player, args)
     -- started (see ReconcileDeaths: that death is final for the run, and
     -- reconnecting must not wash it out)
     if sess.Dead[u] and not sess.RunLocked[u] then
-        sess.Dead[u] = nil
-        print("WQS_MP member rejoined after respawn faction=" .. factionKey .. " user=" .. u)
+        ReleaseRespawn(factionKey, sess, u)
     end
     return true
 end
@@ -1815,6 +1933,11 @@ Handlers["Extracted"] = function(sess, factionKey, player, args)
     local u = GetUserKey(player)
     if sess.Dead[u] or sess.RunLocked[u] then
         print("WQS_MP extract rejected, locked out of run faction=" .. factionKey ..
+            " user=" .. u)
+        return false
+    end
+    if not IsParticipant(sess, u) then
+        print("WQS_MP extract rejected, not part of this run faction=" .. factionKey ..
             " user=" .. u)
         return false
     end

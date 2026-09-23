@@ -330,6 +330,24 @@ WQS_Session.GetSelfMember = function()
     return nil
 end
 
+--- True while the run is under way without this player: they were offline or
+--- dead when it started and have not walked into the zone yet. The server
+--- keeps them out of the member list, so this list is the only way to tell
+--- that apart from having no row at all.
+WQS_Session.IsSelfWaiting = function()
+    local d = WQS_Session.Data
+    if not d or not d.waiting then
+        return false
+    end
+    local me = WQS_Session.GetSelfName()
+    for i = 1, #d.waiting do
+        if d.waiting[i] == me then
+            return true
+        end
+    end
+    return false
+end
+
 WQS_Session.IsSelfReady = function()
     local m = WQS_Session.GetSelfMember()
     return (m ~= nil) and (m.ready == true)
@@ -368,6 +386,11 @@ end
 --- command anyway - and only hides the button from a member the run has
 --- already released.
 WQS_Session.CanSelfExtract = function()
+    -- a late joiner has no row either, so the fail open below would offer
+    -- them the button; the server rejects it, the UI should not offer it
+    if WQS_Session.IsSelfWaiting() then
+        return false
+    end
     local m = WQS_Session.GetSelfMember()
     if not m then
         return true
@@ -628,6 +651,10 @@ Events.OnSafehousesChanged.Add(function() WQS_OnGroupChanged("OnSafehousesChange
 --- can still route a message without blowing up.
 WQS_Session.OnAddTargetResult = function(ok, args) end
 WQS_Session.OnReadyRejected = function(args) end
+WQS_Session.OnWaitingChanged = function(waiting, was) end
+
+--- Last late joiner state seen in a snapshot, for the edge notice.
+WQS_Session.WasWaiting = false
 
 WQS_Session.OnServerMessage = function(command, args)
     if command == "Sync" then
@@ -635,6 +662,14 @@ WQS_Session.OnServerMessage = function(command, args)
         WQS_Session.HasFaction = true
         WQS_Session.Data = args
         WQS_Shared.DLogEdgeReset()
+        local waitingNow = WQS_Session.IsSelfWaiting()
+        if waitingNow ~= WQS_Session.WasWaiting then
+            local was = WQS_Session.WasWaiting
+            WQS_Session.WasWaiting = waitingNow
+            print("WQS_MP client: late joiner waiting=" .. tostring(waitingNow) ..
+                " state=" .. tostring(args and args.state))
+            WQS_Session.OnWaitingChanged(waitingNow, was)
+        end
         if not hadSnapshot then
             -- first snapshot after a join or a group swap: the only client side
             -- proof that targets and activations survived
@@ -651,6 +686,7 @@ WQS_Session.OnServerMessage = function(command, args)
     elseif command == "NoFaction" then
         WQS_Session.HasFaction = false
         WQS_Session.Data = nil
+        WQS_Session.WasWaiting = false
         local now = getTimeInMillis()
         local backoff = NO_GROUP_BACKOFF_MS
         if now < WQS_Session.GroupGraceUntil then

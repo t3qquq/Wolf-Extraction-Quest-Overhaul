@@ -903,7 +903,10 @@ WQS.MainStatusCheck = function()
         -- confirming. Warning past that point would nag about a rule that is
         -- no longer in force.
         local confinedWarn = false
-        if (sstate == "RUNNING") and (SandboxVars.WQS_ConfinedMode_opt == true) and ST.MapData then
+        -- participants only: a late joiner or a locked out member is not held
+        -- by the zone, the timer ignores them, so nagging them is noise
+        if (sstate == "RUNNING") and (SandboxVars.WQS_ConfinedMode_opt == true) and ST.MapData and
+            WQS_Session.IsSelfParticipating() then
             local outOfRadius = ST.Distance_val and (ST.Distance_val > ST.MapData.AreaRadiusFromCenter)
             confinedWarn = outOfRadius or not ST.Zlevel_isok
         end
@@ -981,6 +984,25 @@ WQS_Session.OnReadyRejected = function(args)
         pl:Say(getText("IGUI_WQS_MP_ExcludedFromRun"))
     else
         pl:Say(getText("IGUI_WQS_MP_RequestRejected"))
+    end
+    getSoundManager():playUISound("WQSBlip")
+end
+
+--- Edge notice for the late joiner state. Joining is announced only while a
+--- run is still going: the same edge also fires when the session is destroyed
+--- and a fresh one starts in PRE, which is not joining anything.
+WQS_Session.OnWaitingChanged = function(waiting, was)
+    local pl = WQS.GetCurrentPlayer()
+    if not (pl) then
+        return
+    end
+    local s = WQS_Session.GetState()
+    if waiting then
+        pl:Say(getText("IGUI_WQS_MP_WaitingForZone"))
+    elseif was and ((s == "RUNNING") or (s == "UNLOCKED")) and WQS_Session.GetSelfMember() then
+        pl:Say(getText("IGUI_WQS_MP_JoinedRun"))
+    else
+        return
     end
     getSoundManager():playUISound("WQSBlip")
 end
